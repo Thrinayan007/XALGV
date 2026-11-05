@@ -1,0 +1,90 @@
+{
+  "tasks": [
+    {
+      "task_id": "shell_001",
+      "goal": "Create a directory called 'test_project' in /workspace and list its contents.",
+      "category": "shell",
+      "max_steps": 5,
+      "timeout_seconds": 60,
+      "tags": ["shell", "filesystem"],
+      "checkers": [
+        {
+          "type": "shell",
+          "command": "test -d /workspace/test_project",
+          "description": "Directory test_project exists"
+        }
+      ]
+    },
+    {
+      "task_id": "shell_002",
+      "goal": "Write a bash script at /workspace/greet.sh that prints 'Hello, Agent!' and make it executable.",
+      "category": "shell",
+      "max_steps": 8,
+      "timeout_seconds": 60,
+      "tags": ["shell", "scripting"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/greet.sh"
+        },
+        {
+          "type": "shell",
+          "command": "bash /workspace/greet.sh | grep -q 'Hello, Agent!'",
+          "description": "Script outputs 'Hello, Agent!'"
+        }
+      ]
+    },
+    {
+      "task_id": "shell_003",
+      "goal": "Find all Python files in /usr/lib and count them. Save the count to /workspace/py_count.txt.",
+      "category": "shell",
+      "max_steps": 8,
+      "timeout_seconds": 120,
+      "tags": ["shell", "search"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/py_count.txt"
+        },
+        {
+          "type": "shell",
+          "command": "test -s /workspace/py_count.txt",
+          "description": "File is non-empty"
+        }
+      ]
+    },
+    {
+      "task_id": "shell_004",
+      "goal": "Check the current date and system uptime, then save both to /workspace/sysinfo.txt.",
+      "category": "shell",
+      "max_steps": 5,
+      "timeout_seconds": 60,
+      "tags": ["shell", "system"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/sysinfo.txt"
+        }
+      ]
+    },
+    {
+      "task_id": "shell_005",
+      "goal": "Create a tar.gz archive of /workspace called /workspace/backup.tar.gz.",
+      "category": "shell",
+      "max_steps": 5,
+      "timeout_seconds": 120,
+      "tags": ["shell", "archive"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/backup.tar.gz"
+        },
+        {
+          "type": "shell",
+          "command": "tar -tzf /workspace/backup.tar.gz > /dev/null 2>&1",
+          "description": "Archive is valid"
+        }
+      ]
+    }
+  ]
+}

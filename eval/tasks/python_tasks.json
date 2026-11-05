@@ -1,0 +1,116 @@
+{
+  "tasks": [
+    {
+      "task_id": "python_001",
+      "goal": "Write a Python script at /workspace/fibonacci.py that prints the first 10 Fibonacci numbers, one per line.",
+      "category": "python",
+      "max_steps": 8,
+      "timeout_seconds": 60,
+      "tags": ["python", "script"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/fibonacci.py"
+        },
+        {
+          "type": "shell",
+          "command": "python3 /workspace/fibonacci.py | head -5 | grep -q '1'",
+          "description": "Script runs and outputs numbers"
+        },
+        {
+          "type": "shell",
+          "command": "test $(python3 /workspace/fibonacci.py | wc -l) -eq 10",
+          "description": "Exactly 10 lines of output"
+        }
+      ]
+    },
+    {
+      "task_id": "python_002",
+      "goal": "Create a Python project at /workspace/calculator with a module calculator/calc.py that has add, subtract, multiply, divide functions, and tests/test_calc.py with at least 4 passing tests.",
+      "category": "python",
+      "max_steps": 15,
+      "timeout_seconds": 120,
+      "tags": ["python", "project", "testing"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/calculator/calculator/calc.py"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/calculator/tests/test_calc.py"
+        },
+        {
+          "type": "shell",
+          "command": "cd /workspace/calculator && python3 -m pytest tests/ -v 2>&1 | grep -q 'passed'",
+          "description": "Tests pass"
+        }
+      ]
+    },
+    {
+      "task_id": "python_003",
+      "goal": "Write a Python script at /workspace/word_count.py that reads /workspace/sample.txt and prints the top 5 most common words with their counts. First create sample.txt with at least 50 words.",
+      "category": "python",
+      "max_steps": 10,
+      "timeout_seconds": 60,
+      "tags": ["python", "text_processing"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/sample.txt"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/word_count.py"
+        },
+        {
+          "type": "shell",
+          "command": "python3 /workspace/word_count.py 2>&1 | wc -l | awk '{print ($1 >= 5)}'| grep -q 1",
+          "description": "Script outputs at least 5 lines"
+        }
+      ]
+    },
+    {
+      "task_id": "python_004",
+      "goal": "Create a Python script at /workspace/sort_csv.py that reads /workspace/data.csv, sorts it by the 'age' column, and writes the sorted result to /workspace/sorted_data.csv. First create data.csv with name,age,city headers and 5 rows.",
+      "category": "python",
+      "max_steps": 12,
+      "timeout_seconds": 90,
+      "tags": ["python", "csv"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/data.csv"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/sort_csv.py"
+        },
+        {
+          "type": "shell",
+          "command": "python3 /workspace/sort_csv.py && test -f /workspace/sorted_data.csv",
+          "description": "Script runs and produces output file"
+        }
+      ]
+    },
+    {
+      "task_id": "python_005",
+      "goal": "Write a Python HTTP server script at /workspace/simple_api.py using the http.server module that responds to GET /health with a JSON body {\"status\": \"ok\"}. Do NOT start it, just write the code.",
+      "category": "python",
+      "max_steps": 8,
+      "timeout_seconds": 60,
+      "tags": ["python", "http"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/simple_api.py"
+        },
+        {
+          "type": "shell",
+          "command": "python3 -c \"import ast; ast.parse(open('/workspace/simple_api.py').read())\"",
+          "description": "Script is valid Python"
+        }
+      ]
+    }
+  ]
+}

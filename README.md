@@ -1,55 +1,155 @@
-# Local Agent Web Search Module
+# XALGV — Local Autonomous Computer-Using Agent
 
-Module 1 supplies a local, auditable public-web search capability. It is deliberately limited to search-result retrieval; it does not open pages, log in, solve CAPTCHAs, download files, upload files, or submit forms.
+A local-first, sandboxed, multimodal computer-using agent with dynamic planning, tool execution, browser automation, document intelligence, vision, translation, and custom-model integration.
 
-## First milestone
+**One-sentence description:** A local, sandboxed agent that observes a computer environment, plans, acts through tools, verifies results, and adapts — running entirely on your laptop with open-source models served through Ollama.
 
-```text
-question -> agent tool registry -> web_search -> SearXNG -> normalized results + trace
+## Architecture
+
+```
+User Goal → Planner → [Observe → Decide → Permission Check → Act → Verify] → Done?
+                                                                      ↑              |
+                                                                      +-- Adapt/Re-plan ←-+
+
+Host Machine:                          Docker Sandbox:
+├── Ollama (GPU, model serving)        ├── FastAPI Tool Server (port 9000)
+├── Agent Core (Python)                ├── Xvfb + Openbox (headless GUI)
+├── Model Manager (VRAM scheduler)     ├── Firefox/Chromium (browser)
+├── Memory (SQLite)                    ├── noVNC (port 6080, watch live)
+└── connects over HTTP ───────────────→└── /workspace volume
 ```
 
-The search tool is exposed only when the user enables it:
+## Quick Start
 
-- `off`: no search tool is available to the model.
-- `ask`: the caller must approve the current task before search is available.
-- `on`: the search tool is available for the current task.
+### 1. Prerequisites
 
-## Local setup
+- Python 3.11+
+- Docker & Docker Compose
+- [Ollama](https://ollama.ai) with `qwen3:8b` (or configure another model)
 
-1. Start SearXNG:
+### 2. Install
 
-   ```powershell
-   docker compose up -d searxng
-   ```
+```bash
+pip install -e ".[dev]"
+```
 
-2. Run the test suite:
+### 3. Start Services
 
-   ```powershell
-   python -m unittest discover -s tests -v
-   ```
+```bash
+# Start SearXNG and the sandbox
+docker compose up -d
 
-3. Run a search after enabling it:
+# Pull the default model
+ollama pull qwen3:8b
+```
 
-   ```powershell
-   python -m local_agent.main search "local agent tool calling" --mode on
-   ```
+### 4. Check Health
 
-The default endpoint is `http://localhost:8080`. Override it with `SEARXNG_BASE_URL` when needed.
+```bash
+python -m local_agent.main health
+```
 
-## Why pair web search with a local LLM?
+### 5. Run the Agent
 
-Running the LLM and its search gateway locally can be a good fit when control, privacy, and auditability matter:
+```bash
+python -m local_agent.main run "Create a Python hello-world project with tests"
+```
 
-- **Better privacy:** prompts, search queries, and the resulting metadata can stay on your machine instead of being sent to an LLM provider's server. The search engine still contacts public search sources, so it is not completely offline or anonymous.
-- **Clear user control:** this module exposes search only when the user enables or approves it. A local deployment makes it easier to enforce that rule for every task.
-- **Auditable behavior:** each search can be recorded in a local trace file, making it possible to review which query was sent and which results were returned.
-- **Local safety boundaries:** the client is restricted to a loopback SearXNG endpoint, blocks redirects, and returns only bounded, normalized search-result metadata. You control the configuration and updates.
-- **Independence and customization:** you can choose the model, tune policies, change retention rules, and keep the system usable even when a hosted LLM service is unavailable.
-- **Potentially lower ongoing cost:** after purchasing suitable hardware, local inference can avoid per-token hosted-model charges for frequent or sensitive workloads.
+### 6. Run Evaluation
 
-The trade-offs are that local models may need capable hardware, setup and maintenance are your responsibility, and a hosted model can be more capable or convenient. Also, web search itself requires network access; keeping the LLM local does not prevent SearXNG or its upstream engines from receiving the search query.
+```bash
+python -m local_agent.main eval
+python -m local_agent.main eval --category shell
+```
 
-## Safety boundary
+### 7. Web Search
 
-`web_search` accepts a bounded query and returns only normalized result metadata. It enforces a result limit, a timeout, an endpoint policy, and trace recording. The next milestone will add safe page reading and citation extraction; it is intentionally not included here.
+```bash
+python -m local_agent.main search "local agent tool calling" --mode on
+```
 
+### 8. Watch the Agent Live
+
+Open http://localhost:6080 in your browser to see the sandbox desktop via noVNC.
+
+## Project Structure
+
+```
+├── local_agent/                # Main package
+│   ├── config.py              # Configuration system
+│   ├── models.py              # Ollama model manager with VRAM scheduling
+│   ├── main.py                # CLI entry point
+│   ├── web_search.py          # SearXNG search integration
+│   ├── core/                  # Agent core
+│   │   ├── loop.py            # ReAct control loop
+│   │   ├── planner.py         # LLM-based plan generation
+│   │   ├── verifier.py        # Post-action verification
+│   │   └── state.py           # Mutable agent state
+│   ├── tools/                 # Tool system
+│   │   ├── base.py            # Abstract Tool base class
+│   │   ├── registry.py        # Tool registry with permission gating
+│   │   ├── shell.py           # Shell execution tool
+│   │   ├── file_ops.py        # File read/write/list tools
+│   │   └── python_exec.py     # Python code execution tool
+│   ├── memory/                # Memory subsystem
+│   │   ├── store.py           # SQLite persistent store
+│   │   ├── working.py         # Rolling context window
+│   │   └── checkpoint.py      # Checkpoint and resume
+│   ├── security/              # Security & safety
+│   │   ├── permissions.py     # 5-tier permission system
+│   │   └── budget.py          # Step/time/repeat budget enforcement
+│   └── sandbox/               # Sandbox communication
+│       └── client.py          # HTTP client for the tool server
+├── sandbox/                   # Docker sandbox definition
+│   ├── Dockerfile             # Debian-based Linux workstation
+│   ├── tool_server.py         # FastAPI tool server
+│   └── entrypoint.sh          # Starts Xvfb, Openbox, noVNC, tool server
+├── eval/                      # Evaluation harness
+│   ├── harness.py             # Task runner and reporting
+│   └── tasks/                 # Task suites (JSON)
+│       ├── shell_tasks.json   # 5 shell/filesystem tasks
+│       ├── file_tasks.json    # 5 file operation tasks
+│       └── python_tasks.json  # 5 Python coding tasks
+├── tests/                     # Unit tests
+├── searxng/                   # SearXNG config
+├── compose.yaml               # Docker Compose for sandbox + SearXNG
+└── pyproject.toml             # Project metadata
+```
+
+## Design Principles
+
+| Principle | Meaning |
+|-----------|---------|
+| Dynamic decisions, fixed scaffolding | The loop, tool schemas, permissions, and budgets are fixed and tested |
+| Observe before and after acting | Every action is followed by verification |
+| Structure first, pixels second | DOM/accessibility trees before screenshots |
+| External verification | Check outcomes with code, not LLM judgement |
+| Sandbox by default | Agent never runs on the host |
+| Local-first | Inference, memory, documents stay local |
+| One model at a time | VRAM-aware scheduler swaps models |
+| Measure everything | Eval harness runs after every change |
+
+## Permission Tiers
+
+| Tier | Level | Auto-approved | Examples |
+|------|-------|---------------|----------|
+| READ_ONLY | 0 | ✓ | Read files, list dirs, screenshots |
+| WORKSPACE_WRITE | 1 | ✓ | Write/delete in /workspace |
+| NETWORK | 2 | ✗ | Web search, fetch pages |
+| SYSTEM | 3 | ✗ | Install packages, change config |
+| DESTRUCTIVE | 4 | ✗ (always needs human) | rm -rf, drop tables |
+
+## Running Tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+## Roadmap
+
+- [x] **Phase 0:** Environment, Ollama, tool-calling hello world
+- [x] **Phase 1:** Core loop, sandbox, shell/file/Python tools, eval harness
+- [ ] **Phase 2:** Browser automation (Playwright), SearXNG integration, RAG
+- [ ] **Phase 3:** GUI desktop (Xvfb), VLM, LibreOffice
+- [ ] **Phase 4:** Translation, speech, image generation, VRAM scheduler
+- [ ] **Phase 5:** Skill library, memory, fine-tuning, red teaming, UI

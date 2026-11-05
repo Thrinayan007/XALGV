@@ -1,0 +1,108 @@
+{
+  "tasks": [
+    {
+      "task_id": "file_001",
+      "goal": "Create a file /workspace/hello.txt containing the text 'Hello World'.",
+      "category": "file",
+      "max_steps": 3,
+      "timeout_seconds": 30,
+      "tags": ["file", "write"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/hello.txt"
+        },
+        {
+          "type": "shell",
+          "command": "grep -q 'Hello World' /workspace/hello.txt",
+          "description": "File contains 'Hello World'"
+        }
+      ]
+    },
+    {
+      "task_id": "file_002",
+      "goal": "Create a directory structure: /workspace/project/src and /workspace/project/tests. Add an __init__.py in each.",
+      "category": "file",
+      "max_steps": 8,
+      "timeout_seconds": 60,
+      "tags": ["file", "directory"],
+      "checkers": [
+        {
+          "type": "shell",
+          "command": "test -d /workspace/project/src && test -d /workspace/project/tests",
+          "description": "Both directories exist"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/project/src/__init__.py"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/project/tests/__init__.py"
+        }
+      ]
+    },
+    {
+      "task_id": "file_003",
+      "goal": "Read the file /etc/hostname and save its contents to /workspace/hostname.txt.",
+      "category": "file",
+      "max_steps": 5,
+      "timeout_seconds": 30,
+      "tags": ["file", "read"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/hostname.txt"
+        },
+        {
+          "type": "shell",
+          "command": "test -s /workspace/hostname.txt",
+          "description": "File is non-empty"
+        }
+      ]
+    },
+    {
+      "task_id": "file_004",
+      "goal": "Create a CSV file at /workspace/data.csv with headers 'name,age,city' and three rows of sample data.",
+      "category": "file",
+      "max_steps": 5,
+      "timeout_seconds": 30,
+      "tags": ["file", "csv"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/data.csv"
+        },
+        {
+          "type": "shell",
+          "command": "head -1 /workspace/data.csv | grep -q 'name,age,city'",
+          "description": "CSV has correct headers"
+        },
+        {
+          "type": "shell",
+          "command": "test $(wc -l < /workspace/data.csv) -ge 4",
+          "description": "CSV has at least 4 lines (header + 3 rows)"
+        }
+      ]
+    },
+    {
+      "task_id": "file_005",
+      "goal": "Create a JSON configuration file at /workspace/config.json with keys: name, version, debug, and features (a list).",
+      "category": "file",
+      "max_steps": 5,
+      "timeout_seconds": 30,
+      "tags": ["file", "json"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/config.json"
+        },
+        {
+          "type": "shell",
+          "command": "python3 -c \"import json; d=json.load(open('/workspace/config.json')); assert all(k in d for k in ['name','version','debug','features'])\"",
+          "description": "JSON has required keys"
+        }
+      ]
+    }
+  ]
+}
