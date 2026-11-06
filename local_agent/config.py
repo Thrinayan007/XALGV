@@ -18,6 +18,7 @@ class ModelRoleConfig:
 
 
 # Sensible defaults for an RTX 5060 Laptop (8 GB VRAM).
+# Sensible defaults for an RTX 5060 Laptop (8 GB VRAM) as per project specification.
 DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
     "planner": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.6, thinking=True),
     "executor": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
@@ -52,6 +53,7 @@ class AgentConfig:
     # ── Paths ────────────────────────────────────────────────────────────
     project_root: Path = field(default_factory=lambda: Path(__file__).resolve().parent.parent)
     workspace_dir: Path = field(default=None)  # type: ignore[assignment]
+    data_dir: Path = field(default=None)  # type: ignore[assignment]
     db_path: Path = field(default=None)  # type: ignore[assignment]
     trace_dir: Path = field(default=None)  # type: ignore[assignment]
 
@@ -61,6 +63,8 @@ class AgentConfig:
     def __post_init__(self) -> None:
         if self.workspace_dir is None:
             self.workspace_dir = self.project_root / "workspace"
+        if self.data_dir is None:
+            self.data_dir = self.project_root / "data"
         if self.db_path is None:
             self.db_path = self.project_root / "data" / "agent.db"
         if self.trace_dir is None:
@@ -71,6 +75,7 @@ class AgentConfig:
     def ensure_dirs(self) -> None:
         """Create all required directories if they do not exist."""
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.trace_dir.mkdir(parents=True, exist_ok=True)
 

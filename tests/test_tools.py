@@ -1,8 +1,9 @@
 """Tests for the tool system: base, registry, and permission gating."""
 
-import asyncio
 import unittest
 from typing import Any
+
+import pytest
 
 from local_agent.security.permissions import (
     PermissionDeniedError,
@@ -84,69 +85,69 @@ class TestToolBase(unittest.TestCase):
     def test_tool_result_truncation(self):
         result = ToolResult(success=True, output="x" * 10000)
         truncated = result.truncated(max_chars=100)
-        self.assertLessEqual(len(truncated), 200)  # rough bound with "... truncated ..."
+        self.assertLessEqual(len(truncated), 200)
         self.assertIn("truncated", truncated)
 
 
-class TestToolRegistry(unittest.TestCase):
-    def setUp(self):
+class TestToolRegistry:
+    """Async tool registry tests — pytest-asyncio handles the event loop."""
+
+    @pytest.fixture(autouse=True)
+    def setup_registry(self):
         self.registry = ToolRegistry(PermissionPolicy())
         self.registry.register(EchoTool())
         self.registry.register(DangerousTool())
 
     def test_register_and_lookup(self):
-        self.assertIsNotNone(self.registry.get("echo"))
-        self.assertIsNone(self.registry.get("nonexistent"))
+        assert self.registry.get("echo") is not None
+        assert self.registry.get("nonexistent") is None
 
     def test_duplicate_registration_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.registry.register(EchoTool())
 
     def test_list_tools_filters_by_tier(self):
         read_only = self.registry.list_tools(max_tier=PermissionTier.READ_ONLY)
-        self.assertEqual(len(read_only), 1)
-        self.assertEqual(read_only[0].name, "echo")
+        assert len(read_only) == 1
+        assert read_only[0].name == "echo"
 
         all_tools = self.registry.list_tools()
-        self.assertEqual(len(all_tools), 2)
+        assert len(all_tools) == 2
 
     def test_get_tool_definitions(self):
         defs = self.registry.get_tool_definitions(max_tier=PermissionTier.READ_ONLY)
-        self.assertEqual(len(defs), 1)
-        self.assertEqual(defs[0]["function"]["name"], "echo")
+        assert len(defs) == 1
+        assert defs[0]["function"]["name"] == "echo"
 
-    def test_execute_allowed_tool(self):
-        result = asyncio.get_event_loop().run_until_complete(
-            self.registry.execute("echo", {"message": "hello"})
+    @pytest.mark.asyncio
+    async def test_execute_allowed_tool(self):
+        result = await self.registry.execute("echo", {"message": "hello"})
+        assert result.success
+        assert result.output == "hello"
+
+    @pytest.mark.asyncio
+    async def test_execute_blocked_tool(self):
+        with pytest.raises(PermissionDeniedError):
+            await self.registry.execute("danger", {})
+
+    @pytest.mark.asyncio
+    async def test_execute_blocked_tool_with_approval(self):
+        result = await self.registry.execute("danger", {}, human_approved=True)
+        assert result.success
+
+    @pytest.mark.asyncio
+    async def test_execute_unknown_tool(self):
+        result = await self.registry.execute("unknown", {})
+        assert not result.success
+        assert "Unknown tool" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_and_verify(self):
+        result, verification = await self.registry.execute_and_verify(
+            "echo", {"message": "test"}
         )
-        self.assertTrue(result.success)
-        self.assertEqual(result.output, "hello")
-
-    def test_execute_blocked_tool(self):
-        with self.assertRaises(PermissionDeniedError):
-            asyncio.get_event_loop().run_until_complete(
-                self.registry.execute("danger", {})
-            )
-
-    def test_execute_blocked_tool_with_approval(self):
-        result = asyncio.get_event_loop().run_until_complete(
-            self.registry.execute("danger", {}, human_approved=True)
-        )
-        self.assertTrue(result.success)
-
-    def test_execute_unknown_tool(self):
-        result = asyncio.get_event_loop().run_until_complete(
-            self.registry.execute("unknown", {})
-        )
-        self.assertFalse(result.success)
-        self.assertIn("Unknown tool", result.error)
-
-    def test_execute_and_verify(self):
-        result, verification = asyncio.get_event_loop().run_until_complete(
-            self.registry.execute_and_verify("echo", {"message": "test"})
-        )
-        self.assertTrue(result.success)
-        self.assertEqual(verification.status, VerificationStatus.PASSED)
+        assert result.success
+        assert verification.status == VerificationStatus.PASSED
 
 
 class TestPermissions(unittest.TestCase):

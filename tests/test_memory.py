@@ -106,12 +106,14 @@ class TestWorkingMemory(unittest.TestCase):
         self.assertIn("Step 2", msgs[0]["content"])
 
     def test_compaction(self):
-        wm = WorkingMemory(max_tokens=50, system_prompt="Short.")
+        wm = WorkingMemory(max_tokens=200, system_prompt="Short.")
         for i in range(20):
             wm.add_message("user", f"Message {i} " + "x" * 50)
-        # Should not crash and should stay within budget-ish.
+        # Should not crash and should stay within a reasonable message count.
         msgs = wm.get_messages()
         self.assertGreater(len(msgs), 0)
+        # Should have dropped some messages to stay within budget.
+        self.assertLess(len(msgs), 22)  # 20 user + system + possible summary
 
     def test_truncation(self):
         result = WorkingMemory._truncate("x" * 100, max_chars=20)

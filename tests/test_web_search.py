@@ -1,8 +1,12 @@
+"""Tests for web search — both the low-level service and the Tool wrapper."""
+
 import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from local_agent.web_search import (
     SearchMode,
@@ -27,6 +31,36 @@ class StubClient:
             retrieved_at="2026-11-05T00:00:00Z",
             results=(SearchResult("src_001", "Example", "https://example.com", "Example result", 1, "2026-11-05T00:00:00Z"),),
         )
+
+
+class WebSearchToolTests:
+    """Tests for the WebSearchTool wrapper."""
+
+    def test_tool_schema(self):
+        from local_agent.tools.web_search import WebSearchTool
+        # SearXNG won't be running, so construct manually.
+        tool = WebSearchTool.__new__(WebSearchTool)
+        tool._client = None
+        tool._trace = None
+        tool._service = None
+        tool._mode = SearchMode.ON
+        assert tool.name == "web_search"
+        schema = tool.parameters_schema
+        assert "query" in schema["properties"]
+        defn = tool.to_openai_tool()
+        assert defn["function"]["name"] == "web_search"
+
+    @pytest.mark.asyncio
+    async def test_tool_execute_without_service(self):
+        from local_agent.tools.web_search import WebSearchTool
+        tool = WebSearchTool.__new__(WebSearchTool)
+        tool._client = None
+        tool._trace = None
+        tool._service = None
+        tool._mode = SearchMode.ON
+        result = await tool.execute({"query": "test"})
+        assert not result.success
+        assert "not available" in result.error
 
 
 class WebSearchTests(unittest.TestCase):

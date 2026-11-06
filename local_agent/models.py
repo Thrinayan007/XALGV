@@ -74,7 +74,7 @@ class ModelManager:
         self._config = config
         self._client = httpx.AsyncClient(
             base_url=config.ollama_base_url,
-            timeout=httpx.Timeout(connect=10, read=120, write=30, pool=10),
+            timeout=httpx.Timeout(connect=15, read=360, write=60, pool=10),
         )
         self._current_model: str | None = None
         self._lock = asyncio.Lock()

@@ -29,10 +29,14 @@ RUN useradd -ms /bin/bash agent && mkdir -p /workspace && chown agent:agent /wor
 COPY tool_server_requirements.txt /opt/tool_server/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /opt/tool_server/requirements.txt
 
+# ── Install Playwright browsers ──────────────────────────────────────────
+RUN python3 -m playwright install --with-deps chromium
+
 # ── Tool server ──────────────────────────────────────────────────────────
 COPY tool_server.py /opt/tool_server/tool_server.py
+COPY browser_server.py /opt/tool_server/browser_server.py
 COPY entrypoint.sh /opt/tool_server/entrypoint.sh
-RUN chmod +x /opt/tool_server/entrypoint.sh
+RUN sed -i 's/\r$//' /opt/tool_server/entrypoint.sh && chmod +x /opt/tool_server/entrypoint.sh
 
 # ── Display config ───────────────────────────────────────────────────────
 ENV DISPLAY=:99

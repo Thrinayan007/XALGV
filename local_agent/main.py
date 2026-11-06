@@ -33,11 +33,20 @@ async def cmd_run(args: argparse.Namespace) -> int:
     from local_agent.memory.store import MemoryStore
     from local_agent.models import ModelManager
     from local_agent.sandbox.client import SandboxClient
-    from local_agent.security.permissions import PermissionPolicy
+    from local_agent.security.permissions import PermissionPolicy, PermissionTier
+    from local_agent.tools.browser import (
+        BrowserClickTool,
+        BrowserGetContentTool,
+        BrowserNavigateTool,
+        BrowserScreenshotTool,
+        BrowserTypeTool,
+    )
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
     from local_agent.tools.python_exec import PythonExecTool
+    from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
     from local_agent.tools.shell import ShellExecTool
+    from local_agent.tools.web_search import WebSearchTool
 
     config = AgentConfig.from_env()
     config.ensure_dirs()
@@ -46,14 +55,40 @@ async def cmd_run(args: argparse.Namespace) -> int:
     model_mgr = ModelManager(config)
     memory = MemoryStore(config.db_path)
 
+    # Initialise RAG pipeline (optional — degrades gracefully).
+    rag_pipeline = None
+    try:
+        from local_agent.rag import RAGPipeline, VectorStore
+        rag_pipeline = RAGPipeline(
+            model_manager=model_mgr,
+            vector_store=VectorStore(config.data_dir / "vectordb"),
+        )
+    except Exception:
+        logger.warning("RAG pipeline unavailable — document tools will return errors.")
+
     # Build tool registry.
-    registry = ToolRegistry(PermissionPolicy())
+    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.NETWORK)
+    registry = ToolRegistry(policy)
     registry.register_many(
+        # Phase 1 — file & shell.
         ShellExecTool(sandbox),
         ReadFileTool(sandbox),
         WriteFileTool(sandbox),
         ListFilesTool(sandbox),
         PythonExecTool(sandbox),
+        WebSearchTool(
+            base_url=config.searxng_base_url,
+            trace_dir=str(config.trace_dir),
+        ),
+        # Phase 2 — browser automation.
+        BrowserNavigateTool(sandbox),
+        BrowserGetContentTool(sandbox),
+        BrowserClickTool(sandbox),
+        BrowserTypeTool(sandbox),
+        BrowserScreenshotTool(sandbox),
+        # Phase 2 — RAG / document intelligence.
+        IngestDocumentTool(rag_pipeline),
+        QueryDocumentsTool(rag_pipeline),
     )
 
     loop = AgentLoop(config, model_mgr, registry, memory)
@@ -81,11 +116,20 @@ async def cmd_eval(args: argparse.Namespace) -> int:
     from local_agent.memory.store import MemoryStore
     from local_agent.models import ModelManager
     from local_agent.sandbox.client import SandboxClient
-    from local_agent.security.permissions import PermissionPolicy
+    from local_agent.security.permissions import PermissionPolicy, PermissionTier
+    from local_agent.tools.browser import (
+        BrowserClickTool,
+        BrowserGetContentTool,
+        BrowserNavigateTool,
+        BrowserScreenshotTool,
+        BrowserTypeTool,
+    )
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
     from local_agent.tools.python_exec import PythonExecTool
+    from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
     from local_agent.tools.shell import ShellExecTool
+    from local_agent.tools.web_search import WebSearchTool
 
     config = AgentConfig.from_env()
     config.ensure_dirs()
@@ -94,13 +138,39 @@ async def cmd_eval(args: argparse.Namespace) -> int:
     model_mgr = ModelManager(config)
     memory = MemoryStore(config.db_path)
 
-    registry = ToolRegistry(PermissionPolicy())
+    # Initialise RAG pipeline (optional — degrades gracefully).
+    rag_pipeline = None
+    try:
+        from local_agent.rag import RAGPipeline, VectorStore
+        rag_pipeline = RAGPipeline(
+            model_manager=model_mgr,
+            vector_store=VectorStore(config.data_dir / "vectordb"),
+        )
+    except Exception:
+        logger.warning("RAG pipeline unavailable — document tools will return errors.")
+
+    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.NETWORK)
+    registry = ToolRegistry(policy)
     registry.register_many(
+        # Phase 1 — file & shell.
         ShellExecTool(sandbox),
         ReadFileTool(sandbox),
         WriteFileTool(sandbox),
         ListFilesTool(sandbox),
         PythonExecTool(sandbox),
+        WebSearchTool(
+            base_url=config.searxng_base_url,
+            trace_dir=str(config.trace_dir),
+        ),
+        # Phase 2 — browser automation.
+        BrowserNavigateTool(sandbox),
+        BrowserGetContentTool(sandbox),
+        BrowserClickTool(sandbox),
+        BrowserTypeTool(sandbox),
+        BrowserScreenshotTool(sandbox),
+        # Phase 2 — RAG / document intelligence.
+        IngestDocumentTool(rag_pipeline),
+        QueryDocumentsTool(rag_pipeline),
     )
 
     agent_loop = AgentLoop(config, model_mgr, registry, memory)

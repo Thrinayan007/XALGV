@@ -1,0 +1,63 @@
+[
+  {
+    "task_id": "browser_001",
+    "category": "browser",
+    "description": "Navigate to a URL and extract the page title.",
+    "goal": "Open https://example.com in the browser and tell me the page title.",
+    "verification": {
+      "type": "output_contains",
+      "expected": ["Example Domain"]
+    },
+    "timeout_seconds": 60,
+    "tags": ["browser", "navigate"]
+  },
+  {
+    "task_id": "browser_002",
+    "category": "browser",
+    "description": "Get the accessibility tree of a web page.",
+    "goal": "Navigate to https://example.com and use the accessibility tree to list all links on the page.",
+    "verification": {
+      "type": "output_contains",
+      "expected": ["More information"]
+    },
+    "timeout_seconds": 60,
+    "tags": ["browser", "a11y"]
+  },
+  {
+    "task_id": "browser_003",
+    "category": "browser",
+    "description": "Search the web and summarise results.",
+    "goal": "Use web_search to find 'Python 3.14 new features' and summarise the top 3 results with URLs.",
+    "verification": {
+      "type": "output_contains",
+      "expected": ["Python"]
+    },
+    "timeout_seconds": 90,
+    "tags": ["browser", "search"]
+  },
+  {
+    "task_id": "browser_004",
+    "category": "browser",
+    "description": "Navigate and extract structured text content.",
+    "goal": "Navigate to https://httpbin.org/html and extract all the text content from the page using the browser.",
+    "verification": {
+      "type": "output_contains",
+      "expected": ["Herman Melville"]
+    },
+    "timeout_seconds": 60,
+    "tags": ["browser", "content"]
+  },
+  {
+    "task_id": "browser_005",
+    "category": "browser",
+    "description": "Ingest a document and query it using RAG.",
+    "goal": "Ingest the file /workspace/README.md into the knowledge base, then query 'What is this project about?' and provide a cited answer.",
+    "verification": {
+      "type": "output_contains",
+      "expected": ["agent"]
+    },
+    "timeout_seconds": 120,
+    "tags": ["rag", "query"]
+  }
+]
+

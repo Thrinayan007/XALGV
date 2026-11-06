@@ -68,6 +68,64 @@ class SandboxClient:
         """Take a screenshot of the sandbox desktop."""
         return await self._post("/tools/screenshot", {})
 
+    # ── Browser automation ───────────────────────────────────────────────
+
+    async def browser_navigate(self, url: str, wait_for: str = "load") -> ToolResult:
+        """Navigate the browser to a URL."""
+        return await self._post("/tools/browser/navigate", {
+            "url": url,
+            "wait_for": wait_for,
+        })
+
+    async def browser_get_content(
+        self, mode: str = "a11y", selector: str | None = None
+    ) -> ToolResult:
+        """Get page content (accessibility tree, text, or HTML)."""
+        payload: dict[str, Any] = {"mode": mode}
+        if selector:
+            payload["selector"] = selector
+        return await self._post("/tools/browser/get_content", payload)
+
+    async def browser_click(
+        self,
+        selector: str | None = None,
+        text: str | None = None,
+        role: str | None = None,
+    ) -> ToolResult:
+        """Click an element on the page."""
+        payload: dict[str, Any] = {}
+        if selector:
+            payload["selector"] = selector
+        if text:
+            payload["text"] = text
+        if role:
+            payload["role"] = role
+        return await self._post("/tools/browser/click", payload)
+
+    async def browser_type(
+        self,
+        selector: str,
+        text: str,
+        clear_first: bool = True,
+        press_enter: bool = False,
+    ) -> ToolResult:
+        """Type text into an input element."""
+        return await self._post("/tools/browser/type", {
+            "selector": selector,
+            "text": text,
+            "clear_first": clear_first,
+            "press_enter": press_enter,
+        })
+
+    async def browser_screenshot(
+        self, full_page: bool = False, selector: str | None = None
+    ) -> ToolResult:
+        """Take a screenshot of the browser page."""
+        payload: dict[str, Any] = {"full_page": full_page}
+        if selector:
+            payload["selector"] = selector
+        return await self._post("/tools/browser/screenshot", payload)
+
     # ── Health ───────────────────────────────────────────────────────────
 
     async def health_check(self) -> bool:

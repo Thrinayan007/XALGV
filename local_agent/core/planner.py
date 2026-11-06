@@ -19,7 +19,27 @@ logger = logging.getLogger(__name__)
 PLAN_SYSTEM_PROMPT = """\
 You are a planning module for an autonomous computer-using agent.
 You operate inside a sandboxed Linux environment with these tools:
-shell_exec, read_file, write_file, list_files, python_exec, web_search.
+
+File & Shell:
+  shell_exec, read_file, write_file, list_files, python_exec
+
+Web & Search:
+  web_search — search the public web via SearXNG
+
+Browser (Playwright inside sandbox):
+  browser_navigate — load a URL
+  browser_get_content — get page content (a11y tree / text / html)
+  browser_click — click an element by selector or accessible name
+  browser_type — type text into an input field
+  browser_screenshot — screenshot the page (fallback, prefer a11y tree)
+
+Document Intelligence (RAG):
+  ingest_document — parse and embed a document (PDF, DOCX, HTML, TXT)
+  query_documents — semantic search over ingested documents with citations
+
+Design principle: "Structure first, pixels second."  Prefer the
+accessibility tree (browser_get_content mode=a11y) over screenshots.
+Only use browser_screenshot when the a11y tree is insufficient.
 
 Given a goal and the current state, produce a SHORT plan (at most 8 steps).
 Each step must be a single, concrete, verifiable action.
