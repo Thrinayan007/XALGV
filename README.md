@@ -145,6 +145,29 @@ Open http://localhost:6080 in your browser to see the sandbox desktop via noVNC.
 python -m pytest tests/ -v
 ```
 
+## Grounded Web Research
+
+For a research task, the agent can navigate to a source, extract its readable
+text and metadata, identify linked PDFs, and assess transparent quality signals
+(author, publication date, canonical URL, length, and outbound references).
+Quality scores are heuristics, not factual-accuracy guarantees. Public PDFs are
+downloaded only into the sandbox workspace (25 MB maximum), then ingested with
+`ingest_document` and retrieved through `query_documents` with source/page
+citations.
+
+The agent never solves or bypasses CAPTCHAs. It pauses for human completion
+when one is detected. Credentials are supplied only by environment-variable
+references configured in the sandbox; passwords must never be included in a
+prompt or a tool call. Logging in and downloading PDFs require elevated
+permission, while form submission always requires explicit human approval and
+the per-action confirmation phrase `I_CONFIRM_SUBMIT`.
+
+After changing the sandbox, rebuild it before use:
+
+```bash
+docker compose up -d --build sandbox
+```
+
 ## Roadmap
 
 - [x] **Phase 0:** Environment, Ollama, tool-calling hello world

@@ -39,6 +39,10 @@ async def cmd_run(args: argparse.Namespace) -> int:
         BrowserGetContentTool,
         BrowserNavigateTool,
         BrowserScreenshotTool,
+        BrowserDownloadPdfTool,
+        BrowserExtractResearchTool,
+        BrowserLoginTool,
+        BrowserSubmitFormTool,
         BrowserTypeTool,
     )
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
@@ -86,6 +90,10 @@ async def cmd_run(args: argparse.Namespace) -> int:
         BrowserClickTool(sandbox),
         BrowserTypeTool(sandbox),
         BrowserScreenshotTool(sandbox),
+        BrowserExtractResearchTool(sandbox),
+        BrowserDownloadPdfTool(sandbox),
+        BrowserLoginTool(sandbox),
+        BrowserSubmitFormTool(sandbox),
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),
@@ -122,6 +130,10 @@ async def cmd_eval(args: argparse.Namespace) -> int:
         BrowserGetContentTool,
         BrowserNavigateTool,
         BrowserScreenshotTool,
+        BrowserDownloadPdfTool,
+        BrowserExtractResearchTool,
+        BrowserLoginTool,
+        BrowserSubmitFormTool,
         BrowserTypeTool,
     )
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
@@ -168,6 +180,10 @@ async def cmd_eval(args: argparse.Namespace) -> int:
         BrowserClickTool(sandbox),
         BrowserTypeTool(sandbox),
         BrowserScreenshotTool(sandbox),
+        BrowserExtractResearchTool(sandbox),
+        BrowserDownloadPdfTool(sandbox),
+        BrowserLoginTool(sandbox),
+        BrowserSubmitFormTool(sandbox),
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),

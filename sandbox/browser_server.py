@@ -10,9 +10,12 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -83,6 +86,24 @@ class TypeRequest(BaseModel):
 class ScreenshotRequest(BaseModel):
     full_page: bool = False
     selector: str | None = None
+
+
+class DownloadRequest(BaseModel):
+    url: str
+    filename: str | None = None
+
+
+class LoginRequest(BaseModel):
+    username_selector: str
+    password_selector: str
+    username_env: str
+    password_env: str
+    submit_selector: str | None = None
+
+
+class SubmitRequest(BaseModel):
+    selector: str
+    confirmation: str
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────
@@ -225,6 +246,130 @@ async def browser_screenshot(req: ScreenshotRequest) -> BrowserResponse:
         )
     except Exception as exc:
         return BrowserResponse(success=False, error=f"Screenshot error: {exc}")
+
+
+def _captcha_present(text: str) -> bool:
+    """Detect a challenge and stop; solving or bypassing one is never attempted."""
+    markers = ("captcha", "recaptcha", "hcaptcha", "verify you are human", "security check")
+    return any(marker in text.lower() for marker in markers)
+
+
+async def _page_text(page: Any) -> str:
+    return await page.inner_text("body", timeout=5000)
+
+
+@router.post("/extract", response_model=BrowserResponse)
+async def extract(req: ContentRequest) -> BrowserResponse:
+    """Extract readable page text, metadata, links, and candidate PDFs for research."""
+    try:
+        page = await _ensure_browser()
+        body = await _page_text(page)
+        if _captcha_present(body):
+            return BrowserResponse(success=False, error="CAPTCHA detected. Human completion is required; the agent will not bypass it.")
+
+        data = await page.evaluate("""() => {
+            const meta = name => document.querySelector(`meta[name="${name}"], meta[property="${name}"]`)?.content || "";
+            const links = [...document.querySelectorAll('a[href]')].map(a => ({text: (a.innerText || '').trim(), url: a.href}));
+            return {
+              title: document.title,
+              url: location.href,
+              description: meta('description') || meta('og:description'),
+              author: meta('author') || meta('article:author'),
+              published: meta('article:published_time') || meta('date') || '',
+              canonical: document.querySelector('link[rel="canonical"]')?.href || location.href,
+              links
+            };
+        }""")
+        links = data.pop("links", [])
+        pdfs = [link["url"] for link in links if re.search(r"\\.pdf(?:[?#].*)?$", link["url"], re.I)][:20]
+        external_domains = {re.sub(r"^www\\.", "", re.split(r"/", link["url"].split("://", 1)[-1])[0]) for link in links if link["url"].startswith("http")}
+        # Transparent heuristic, not an assertion of truthfulness.
+        score = 40
+        score += 15 if data["author"] else 0
+        score += 15 if data["published"] else 0
+        score += 10 if data["canonical"] else 0
+        score += 10 if len(body) > 1500 else 0
+        score += 10 if len(external_domains) >= 2 else 0
+        payload = {
+            "source": data,
+            "quality": {
+                "score": min(score, 100),
+                "method": "metadata/transparency heuristic; not a factual-accuracy guarantee",
+                "signals": {"has_author": bool(data["author"]), "has_publication_date": bool(data["published"]), "long_form": len(body) > 1500, "external_link_domains": len(external_domains)},
+            },
+            "pdf_links": pdfs,
+            "text": body[:80000],
+        }
+        return BrowserResponse(success=True, output=json.dumps(payload, ensure_ascii=False))
+    except Exception as exc:
+        return BrowserResponse(success=False, error=f"Extraction error: {exc}")
+
+
+@router.post("/download", response_model=BrowserResponse)
+async def download(req: DownloadRequest) -> BrowserResponse:
+    """Download a public PDF into /workspace/downloads with a size limit."""
+    if not req.url.startswith(("https://", "http://")):
+        return BrowserResponse(success=False, error="Only http(s) downloads are allowed.")
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+            async with client.stream("GET", req.url) as response:
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "").lower()
+                if "pdf" not in content_type and not re.search(r"\\.pdf(?:[?#].*)?$", str(response.url), re.I):
+                    return BrowserResponse(success=False, error="Refusing non-PDF download.")
+                name = re.sub(r"[^A-Za-z0-9._-]", "_", req.filename or Path(str(response.url).split("?", 1)[0]).name or "document.pdf")
+                if not name.lower().endswith(".pdf"):
+                    name += ".pdf"
+                target_dir = Path("/workspace/downloads")
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target = target_dir / name
+                size = 0
+                with target.open("wb") as handle:
+                    async for chunk in response.aiter_bytes():
+                        size += len(chunk)
+                        if size > 25 * 1024 * 1024:
+                            target.unlink(missing_ok=True)
+                            return BrowserResponse(success=False, error="Refusing PDF larger than 25 MB.")
+                        handle.write(chunk)
+        return BrowserResponse(success=True, output=f"Downloaded PDF to {target}", artifacts=[str(target)])
+    except Exception as exc:
+        return BrowserResponse(success=False, error=f"Download error: {exc}")
+
+
+@router.post("/login", response_model=BrowserResponse)
+async def login(req: LoginRequest) -> BrowserResponse:
+    """Log in using secrets already supplied to the sandbox environment."""
+    username, password = os.environ.get(req.username_env), os.environ.get(req.password_env)
+    if not username or not password:
+        return BrowserResponse(success=False, error="Required credential environment variables are unavailable in the sandbox.")
+    try:
+        page = await _ensure_browser()
+        if _captcha_present(await _page_text(page)):
+            return BrowserResponse(success=False, error="CAPTCHA detected. Human completion is required; the agent will not bypass it.")
+        await page.fill(req.username_selector, username, timeout=5000)
+        await page.fill(req.password_selector, password, timeout=5000)
+        if req.submit_selector:
+            await page.click(req.submit_selector, timeout=5000)
+            await page.wait_for_timeout(1000)
+        return BrowserResponse(success=True, output=f"Credentials entered; current URL: {page.url}")
+    except Exception as exc:
+        return BrowserResponse(success=False, error=f"Login error: {exc}")
+
+
+@router.post("/submit", response_model=BrowserResponse)
+async def submit(req: SubmitRequest) -> BrowserResponse:
+    """Submit a form only after an explicit, per-action confirmation phrase."""
+    if req.confirmation != "I_CONFIRM_SUBMIT":
+        return BrowserResponse(success=False, error="Form submission requires confirmation='I_CONFIRM_SUBMIT'.")
+    try:
+        page = await _ensure_browser()
+        if _captcha_present(await _page_text(page)):
+            return BrowserResponse(success=False, error="CAPTCHA detected. Human completion is required; the agent will not bypass it.")
+        await page.click(req.selector, timeout=5000)
+        await page.wait_for_timeout(1000)
+        return BrowserResponse(success=True, output=f"Form submitted; current URL: {page.url}")
+    except Exception as exc:
+        return BrowserResponse(success=False, error=f"Submit error: {exc}")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────

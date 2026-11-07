@@ -319,3 +319,115 @@ class BrowserScreenshotTool(Tool):
             selector=params.get("selector"),
         )
 
+
+class BrowserExtractResearchTool(Tool):
+    """Extract a page deeply enough to ground research and identify PDFs."""
+
+    def __init__(self, sandbox_client: Any = None) -> None:
+        self._sandbox = sandbox_client
+
+    @property
+    def name(self) -> str:
+        return "browser_extract_research"
+
+    @property
+    def description(self) -> str:
+        return "Extract full readable page text, source metadata, PDF links, and a transparent source-quality heuristic. Navigate first. CAPTCHA pages are reported for human completion."
+
+    @property
+    def permission_tier(self) -> PermissionTier:
+        return PermissionTier.NETWORK
+
+    @property
+    def parameters_schema(self) -> dict[str, Any]:
+        return {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
+
+    async def execute(self, params: dict[str, Any]) -> ToolResult:
+        if self._sandbox is None:
+            return ToolResult(success=False, output="", error="Sandbox not configured.")
+        return await self._sandbox.browser_extract()
+
+
+class BrowserDownloadPdfTool(Tool):
+    """Download a public PDF to the sandbox workspace for RAG ingestion."""
+
+    def __init__(self, sandbox_client: Any = None) -> None:
+        self._sandbox = sandbox_client
+
+    @property
+    def name(self) -> str:
+        return "browser_download_pdf"
+
+    @property
+    def description(self) -> str:
+        return "Download a public PDF (max 25 MB) into /workspace/downloads. Then use ingest_document on the returned path."
+
+    @property
+    def permission_tier(self) -> PermissionTier:
+        return PermissionTier.SYSTEM
+
+    @property
+    def parameters_schema(self) -> dict[str, Any]:
+        return {"type": "object", "properties": {"url": {"type": "string"}, "filename": {"type": "string"}}, "required": ["url"], "additionalProperties": False}
+
+    async def execute(self, params: dict[str, Any]) -> ToolResult:
+        if self._sandbox is None:
+            return ToolResult(success=False, output="", error="Sandbox not configured.")
+        return await self._sandbox.browser_download_pdf(params["url"], params.get("filename"))
+
+
+class BrowserLoginTool(Tool):
+    """Fill a login form using credential references, never raw secrets."""
+
+    def __init__(self, sandbox_client: Any = None) -> None:
+        self._sandbox = sandbox_client
+
+    @property
+    def name(self) -> str:
+        return "browser_login"
+
+    @property
+    def description(self) -> str:
+        return "Log in to the current site using named credential environment variables already configured in the sandbox. Never provide passwords in tool arguments. CAPTCHA challenges require the human user."
+
+    @property
+    def permission_tier(self) -> PermissionTier:
+        return PermissionTier.SYSTEM
+
+    @property
+    def parameters_schema(self) -> dict[str, Any]:
+        return {"type": "object", "properties": {"username_selector": {"type": "string"}, "password_selector": {"type": "string"}, "username_env": {"type": "string"}, "password_env": {"type": "string"}, "submit_selector": {"type": "string"}}, "required": ["username_selector", "password_selector", "username_env", "password_env"], "additionalProperties": False}
+
+    async def execute(self, params: dict[str, Any]) -> ToolResult:
+        if self._sandbox is None:
+            return ToolResult(success=False, output="", error="Sandbox not configured.")
+        return await self._sandbox.browser_login(**params)
+
+
+class BrowserSubmitFormTool(Tool):
+    """Submit a form after explicit human approval and confirmation."""
+
+    def __init__(self, sandbox_client: Any = None) -> None:
+        self._sandbox = sandbox_client
+
+    @property
+    def name(self) -> str:
+        return "browser_submit_form"
+
+    @property
+    def description(self) -> str:
+        return "Submit a form only after the user has reviewed it. This is irreversible/external side effect and always requires human approval plus the exact confirmation phrase."
+
+    @property
+    def permission_tier(self) -> PermissionTier:
+        return PermissionTier.DESTRUCTIVE
+
+    @property
+    def parameters_schema(self) -> dict[str, Any]:
+        return {"type": "object", "properties": {"selector": {"type": "string"}, "confirmation": {"type": "string", "const": "I_CONFIRM_SUBMIT"}}, "required": ["selector", "confirmation"], "additionalProperties": False}
+
+    async def execute(self, params: dict[str, Any]) -> ToolResult:
+        if self._sandbox is None:
+            return ToolResult(success=False, output="", error="Sandbox not configured.")
+        return await self._sandbox.browser_submit(params["selector"], params["confirmation"])
+

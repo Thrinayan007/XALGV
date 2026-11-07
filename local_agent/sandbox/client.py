@@ -126,6 +126,21 @@ class SandboxClient:
             payload["selector"] = selector
         return await self._post("/tools/browser/screenshot", payload)
 
+    async def browser_extract(self) -> ToolResult:
+        return await self._post("/tools/browser/extract", {})
+
+    async def browser_download_pdf(self, url: str, filename: str | None = None) -> ToolResult:
+        payload: dict[str, Any] = {"url": url}
+        if filename:
+            payload["filename"] = filename
+        return await self._post("/tools/browser/download", payload)
+
+    async def browser_login(self, **params: str) -> ToolResult:
+        return await self._post("/tools/browser/login", params)
+
+    async def browser_submit(self, selector: str, confirmation: str) -> ToolResult:
+        return await self._post("/tools/browser/submit", {"selector": selector, "confirmation": confirmation})
+
     # ── Health ───────────────────────────────────────────────────────────
 
     async def health_check(self) -> bool:
