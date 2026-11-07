@@ -1,3 +1,4 @@
+
 """Sandbox client — communicates with the FastAPI tool server inside Docker.
 
 The sandbox client is the *only* way the agent executes actions.  All
@@ -51,11 +52,12 @@ class SandboxClient:
             "max_lines": max_lines,
         })
 
-    async def write_file(self, path: str, content: str) -> ToolResult:
-        """Write a file in the sandbox."""
+    async def write_file(self, path: str, content: str, append: bool = False) -> ToolResult:
+        """Write (or append to) a file in the sandbox."""
         return await self._post("/tools/write_file", {
             "path": path,
             "content": content,
+            "append": append,
         })
 
     async def list_files(self, path: str = "/workspace") -> ToolResult:
@@ -165,3 +167,4 @@ class SandboxClient:
                 success=False, output="",
                 error=f"Cannot reach sandbox: {exc}",
             )
+

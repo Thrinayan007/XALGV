@@ -1,3 +1,4 @@
+
 """FastAPI tool server — runs inside the Docker sandbox.
 
 This server exposes shell, file, and screenshot tools over HTTP.
@@ -53,6 +54,7 @@ class ReadFileRequest(BaseModel):
 class WriteFileRequest(BaseModel):
     path: str
     content: str
+    append: bool = False
 
 
 class ListFilesRequest(BaseModel):
@@ -132,8 +134,16 @@ async def write_file(req: WriteFileRequest) -> ToolResponse:
         path = WORKSPACE / path
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(req.content, encoding="utf-8")
-        return ToolResponse(success=True, output=f"Wrote {len(req.content)} bytes to {path}")
+        if req.append:
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(req.content)
+        else:
+            path.write_text(req.content, encoding="utf-8")
+        verb = "Appended" if req.append else "Wrote"
+        return ToolResponse(
+            success=True,
+            output=f"{verb} {len(req.content)} chars to {path} (file size now {path.stat().st_size} bytes)",
+        )
     except Exception as exc:
         return ToolResponse(success=False, output="", error=f"Write error: {exc}")
 
@@ -178,3 +188,4 @@ async def screenshot() -> ToolResponse:
         )
     except Exception as exc:
         return ToolResponse(success=False, output="", error=f"Screenshot error: {exc}")
+

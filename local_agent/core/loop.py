@@ -1,3 +1,4 @@
+
 """Agent control loop — the core ReAct-style execution engine.
 
 Flow:
@@ -96,10 +97,25 @@ class AgentLoop:
         )
         budget.start()
 
+        exec_cfg = self._config.model_roles.get("executor", self._config.model_roles["planner"])
+        tool_defs = self._tools.get_tool_definitions()
+        # Tool schemas, the system prompt and the generation reserve all share num_ctx with
+        # the conversation, so only the remainder is available to working memory.
+        tool_tokens = len(json.dumps(tool_defs)) // 3
+        history_budget = exec_cfg.context_length - tool_tokens - 700 - 1024
+        if history_budget < 1000:
+            logger.warning(
+                "Context is tight: num_ctx=%d, tool schemas ~%d tokens. Only ~%d tokens remain for "
+                "conversation + output. Raise context_length (8192+ recommended) or expose fewer tools.",
+                exec_cfg.context_length, tool_tokens, max(history_budget, 0),
+            )
         working = WorkingMemory(
-            max_tokens=self._config.model_roles.get("executor", self._config.model_roles["planner"]).context_length,
+            max_tokens=max(history_budget, 768),
             system_prompt="",  # Will be set dynamically each turn.
         )
+        max_nudges = getattr(self._config, "max_nudges", 3)
+        consecutive_nudges = 0
+        announce_task = True
 
         try:
             # ── Phase 1: Planning ────────────────────────────────────────
@@ -127,7 +143,8 @@ class AgentLoop:
             state.status = RunStatus.EXECUTING
             self._memory.update_run_status(run_id, RunStatus.EXECUTING)
 
-            while not state.is_terminal and state.current_step < len(state.plan):
+            # while not state.is_terminal and state.current_step < len(state.plan):
+            while not state.is_terminal:
                 if self._killed:
                     state.status = RunStatus.KILLED
                     break
@@ -151,12 +168,13 @@ class AgentLoop:
                 working.set_plan(state.plan)
                 working.set_scratchpad(state.scratchpad)
 
-                # Add current task instruction.
-                current_task = state.current_plan_step or "Continue working on the goal."
-                working.add_message("user", f"Execute this step: {current_task}")
+                # Add current task instruction (not again right after a nudge).
+                if announce_task:
+                    current_task = state.current_plan_step or "Continue working on the goal."
+                    working.add_message("user", f"Execute this step: {current_task}")
+                announce_task = True
 
                 # Get model decision.
-                tool_defs = self._tools.get_tool_definitions()
                 response = await self._model.chat(
                     "executor",
                     working.get_messages(),
@@ -167,6 +185,7 @@ class AgentLoop:
 
                 # ── Handle tool calls ────────────────────────────────────
                 if response.has_tool_calls:
+                    consecutive_nudges = 0
                     tc = response.tool_calls[0]  # One tool per turn.
                     action_key = f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True)[:100]}"
 
@@ -219,10 +238,17 @@ class AgentLoop:
                     self._memory.record_step(run_id, step_rec)
                     budget.record_step(action_key)
 
-                    # Feed result back to working memory.
-                    working.add_message("assistant", response.content)
+                    # Preserve the assistant's original tool-call message.
+                    working.add_message(
+                        "assistant",
+                        response.content,
+                        thinking=response.thinking,
+                        tool_calls=[{"function": {"name": tc.name, "arguments": tc.arguments}}],
+                    )
+
+                    # Add the corresponding tool result.
                     working.add_tool_result(
-                        tc.id,
+                        tc.name,
                         f"Success: {result.success}\nOutput: {result.truncated()}"
                         + (f"\nError: {result.error}" if result.error else "")
                         + f"\nVerification: {verification.status.value} — {verification.message}",
@@ -264,24 +290,48 @@ class AgentLoop:
                         state.status = RunStatus.AWAITING_HUMAN
                         state.last_error = content[8:].strip()
                     else:
-                        # Model responded without calling a tool — nudge it.
-                        working.add_message("assistant", content)
+                        # Model responded without calling a tool: nudge it, but give up
+                        # quickly if it keeps doing so instead of burning the step budget.
+                        consecutive_nudges += 1
+                        logger.warning(
+                            "No tool call from model (%d/%d): content=%d chars, thinking=%d chars, "
+                            "done_reason=%s",
+                            consecutive_nudges, max_nudges, len(content),
+                            len(response.thinking or ""), response.done_reason or "?",
+                        )
+                        if consecutive_nudges >= max_nudges:
+                            state.status = RunStatus.FAILED
+                            state.last_error = (
+                                f"Model returned {consecutive_nudges} consecutive responses without a "
+                                f"tool call (last: content={len(content)} chars, "
+                                f"thinking={len(response.thinking or '')} chars, "
+                                f"done_reason={response.done_reason or '?'}). Likely causes: context "
+                                "window too small for the tool schemas, thinking consuming the output "
+                                "budget, or the model's tool-call format not being parsed."
+                            )
+                            break
+                        working.add_message("assistant", content or "(empty response)")
                         working.add_message(
                             "user",
                             "You must call a tool to make progress.  "
                             "Use one of the available tools, or respond with DONE: or BLOCKED: if finished.",
                         )
-                        budget.record_step("nudge")
+                        announce_task = False
                         continue
 
                 # Checkpoint after each step.
                 self._save_checkpoint(state, working)
 
             # ── Finalise ─────────────────────────────────────────────────
+            # if state.status == RunStatus.EXECUTING:
+            #     # Ran out of plan steps → assume completed.
+            #     state.status = RunStatus.COMPLETED
             if state.status == RunStatus.EXECUTING:
-                # Ran out of plan steps → assume completed.
-                state.status = RunStatus.COMPLETED
-
+                state.status = RunStatus.FAILED
+                state.last_error = (
+                    "Execution plan exhausted without an explicit DONE response. "
+                    "The goal may be incomplete. Required deliverables were not confirmed."
+                )
         except Exception as exc:
             logger.exception("Agent loop crashed")
             state.status = RunStatus.FAILED
@@ -309,3 +359,4 @@ class AgentLoop:
             self._checkpoint.save(cp)
         except Exception:
             logger.warning("Failed to save checkpoint for run %s", state.run_id)
+

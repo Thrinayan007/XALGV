@@ -1,3 +1,4 @@
+
 """File operation tools — read, write, list, and delete files in the sandbox."""
 
 from __future__ import annotations
@@ -75,7 +76,11 @@ class WriteFileTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Write content to a file.  Creates parent directories if needed.  Overwrites existing files."
+        return (
+            "Write content to a file.  Creates parent directories if needed.  Overwrites existing files "
+            "unless append=true.  For large files, write the first part, then add the rest in several "
+            "calls with append=true."
+        )
 
     @property
     def permission_tier(self) -> PermissionTier:
@@ -92,7 +97,12 @@ class WriteFileTool(Tool):
                 },
                 "content": {
                     "type": "string",
-                    "description": "The full text content to write.",
+                    "description": "The text content to write.",
+                },
+                "append": {
+                    "type": "boolean",
+                    "description": "Append to the file instead of overwriting (default: false).",
+                    "default": False,
                 },
             },
             "required": ["path", "content"],
@@ -102,7 +112,9 @@ class WriteFileTool(Tool):
     async def execute(self, params: dict[str, Any]) -> ToolResult:
         if self._sandbox is None:
             return ToolResult(success=False, output="", error="Sandbox not configured.")
-        return await self._sandbox.write_file(params["path"], params["content"])
+        return await self._sandbox.write_file(
+            params["path"], params["content"], append=bool(params.get("append", False))
+        )
 
     async def verify(self, params: dict[str, Any], result: ToolResult) -> VerificationResult:
         # Verify by reading back and checking the file exists.
@@ -159,3 +171,4 @@ class ListFilesTool(Tool):
         if self._sandbox is None:
             return ToolResult(success=False, output="", error="Sandbox not configured.")
         return await self._sandbox.list_files(params.get("path", "/workspace"))
+

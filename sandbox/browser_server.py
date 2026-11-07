@@ -81,9 +81,9 @@ class TypeRequest(BaseModel):
 
 
 class ScreenshotRequest(BaseModel):
-    full_page: bool = False
-    selector: str | None = None
-
+    direction: str = "down"
+    pixels: int = 600
+    wait_ms: int = 400
 
 # ── Endpoints ────────────────────────────────────────────────────────────
 

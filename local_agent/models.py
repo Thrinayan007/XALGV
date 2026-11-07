@@ -1,3 +1,4 @@
+
 """Ollama model manager with role-based VRAM-aware scheduling.
 
 The manager maps logical roles (planner, vision, embed, …) to concrete
@@ -40,6 +41,8 @@ class ChatResponse:
     model: str
     role: str
     done: bool
+    thinking: str = ""
+    done_reason: str = ""
     total_duration_ns: int = 0
     eval_count: int = 0
     prompt_eval_count: int = 0
@@ -78,6 +81,7 @@ class ModelManager:
         )
         self._current_model: str | None = None
         self._lock = asyncio.Lock()
+        self._no_think: set[str] = set()  # models that reject the `think` option
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -107,8 +111,17 @@ class ModelManager:
             payload["options"]["num_predict"] = max_tokens
         if tools:
             payload["tools"] = tools
+        # Control thinking explicitly (executor: off, planner: on). Models that do not
+        # support the option are remembered and retried without it.
+        if role_cfg.model not in self._no_think:
+            payload["think"] = role_cfg.thinking
 
         resp = await self._client.post("/api/chat", json=payload)
+        if resp.status_code == 400 and "think" in payload and "think" in resp.text.lower():
+            logger.info("Model %s does not support 'think'; retrying without it.", role_cfg.model)
+            self._no_think.add(role_cfg.model)
+            payload.pop("think")
+            resp = await self._client.post("/api/chat", json=payload)
         resp.raise_for_status()
         data = resp.json()
 
@@ -118,17 +131,39 @@ class ModelManager:
         for i, tc in enumerate(msg.get("tool_calls", [])):
             fn = tc.get("function", {})
             tool_calls.append(ToolCall(
-                id=f"call_{i}",
+                id=tc.get("id", f"call_{i}"),
                 name=fn.get("name", ""),
                 arguments=fn.get("arguments", {}),
             ))
 
+        prompt_tokens = data.get("prompt_eval_count", 0) or 0
+        gen_tokens = data.get("eval_count", 0) or 0
+        done_reason = data.get("done_reason", "") or ""
+        content_text = msg.get("content", "") or ""
+        thinking_text = msg.get("thinking", "") or ""
+        logger.info(
+            "chat[%s] %s: prompt=%d/%d tok, generated=%d tok, done_reason=%s, "
+            "content=%d chars, thinking=%d chars, tool_calls=%d",
+            role, role_cfg.model, prompt_tokens, role_cfg.context_length, gen_tokens,
+            done_reason or "?", len(content_text), len(thinking_text), len(tool_calls),
+        )
+        if prompt_tokens >= 0.9 * role_cfg.context_length:
+            logger.warning(
+                "Prompt used %d of %d context tokens (role=%s). Ollama silently truncates input "
+                "beyond num_ctx, which breaks tool calling. Raise context_length or shrink the "
+                "prompt/tools.", prompt_tokens, role_cfg.context_length, role,
+            )
+        if done_reason == "length":
+            logger.warning("Generation for role=%s stopped at the token/context limit.", role)
+
         return ChatResponse(
-            content=msg.get("content", ""),
+            content=content_text,
             tool_calls=tool_calls,
             model=data.get("model", role_cfg.model),
             role=msg.get("role", "assistant"),
             done=data.get("done", True),
+            thinking=thinking_text,
+                done_reason=done_reason,
             total_duration_ns=data.get("total_duration", 0),
             eval_count=data.get("eval_count", 0),
             prompt_eval_count=data.get("prompt_eval_count", 0),
@@ -210,3 +245,4 @@ class ModelManager:
                 logger.warning("Failed to pre-load model %s — will try on first call", model)
 
             self._current_model = model
+

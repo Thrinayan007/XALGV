@@ -19,15 +19,55 @@ class ModelRoleConfig:
 
 # Sensible defaults for an RTX 5060 Laptop (8 GB VRAM).
 # Sensible defaults for an RTX 5060 Laptop (8 GB VRAM) as per project specification.
+# DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
+#     "planner": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.6, thinking=True),
+#     "executor": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
+#     "router": ModelRoleConfig(model="qwen3:1.7b", context_length=4096, temperature=0.1),
+#     "vision": ModelRoleConfig(model="qwen2.5-vl:7b", context_length=4096, temperature=0.3),
+#     "embed": ModelRoleConfig(model="bge-m3", context_length=8192, temperature=0.0),
+#     "translate": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
+# }
 DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
-    "planner": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.6, thinking=True),
-    "executor": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
-    "router": ModelRoleConfig(model="qwen3:1.7b", context_length=4096, temperature=0.1),
-    "vision": ModelRoleConfig(model="qwen2.5-vl:7b", context_length=4096, temperature=0.3),
-    "embed": ModelRoleConfig(model="bge-m3", context_length=8192, temperature=0.0),
-    "translate": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
-}
+    "planner": ModelRoleConfig(
+        model="qwen3.5:9b-q4_K_M",
+        context_length=4096,
+        temperature=0.6,
+        thinking=False
+    ),
 
+    "executor": ModelRoleConfig(
+        model="qwen3.5:9b-q4_K_M",
+        # context_length=4096,
+        # temperature=0.3
+        context_length=8192,
+        temperature=0.3,
+        thinking=False
+    ),
+
+    "router": ModelRoleConfig(
+        model="qwen3:1.7b",
+        context_length=4096,
+        temperature=0.1
+    ),
+
+    "vision": ModelRoleConfig(
+        model="qwen2.5-vl:7b",
+        context_length=4096,
+        temperature=0.3
+    ),
+
+    "embed": ModelRoleConfig(
+        model="bge-m3",
+        context_length=8192,
+        temperature=0.0
+    ),
+
+    "translate": ModelRoleConfig(
+        model="qwen3:8b",
+        context_length=8192,
+        temperature=0.3
+    ),
+}
 
 @dataclass
 class AgentConfig:

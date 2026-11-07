@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm \
     git build-essential \
     # GUI / display
-    xvfb openbox x11-utils x11vnc xdotool wmctrl scrot \
+   # GUI / display
+    xvfb openbox xterm feh xdg-utils x11-utils x11vnc xdotool wmctrl scrot \
     # Accessibility
     at-spi2-core \
     # noVNC for remote viewing
@@ -30,7 +31,13 @@ COPY tool_server_requirements.txt /opt/tool_server/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r /opt/tool_server/requirements.txt
 
 # ── Install Playwright browsers ──────────────────────────────────────────
-RUN python3 -m playwright install --with-deps chromium
+# RUN python3 -m playwright install --with-deps chromium
+# Install browsers in a shared directory accessible to agent.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+RUN mkdir -p /ms-playwright \
+    && python3 -m playwright install --with-deps chromium \
+    && chmod -R a+rX /ms-playwright
 
 # ── Tool server ──────────────────────────────────────────────────────────
 COPY tool_server.py /opt/tool_server/tool_server.py

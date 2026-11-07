@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+import re
 
 from local_agent.core.state import AgentState
 from local_agent.models import ModelManager
@@ -41,8 +42,8 @@ Design principle: "Structure first, pixels second."  Prefer the
 accessibility tree (browser_get_content mode=a11y) over screenshots.
 Only use browser_screenshot when the a11y tree is insufficient.
 
-Given a goal and the current state, produce a SHORT plan (at most 8 steps).
-Each step must be a single, concrete, verifiable action.
+Given a goal and the current state, produce a plan of at most 16 steps.
+Each step must be a single, concrete, verifiable tool action.
 
 Respond with ONLY a JSON object:
 {
@@ -67,7 +68,7 @@ Respond with ONLY a JSON object:
 class Planner:
     """Generates and revises plans via the model manager."""
 
-    def __init__(self, model_manager: ModelManager, max_plan_steps: int = 8) -> None:
+    def __init__(self, model_manager: ModelManager, max_plan_steps: int = 16) -> None:
         self._model = model_manager
         self._max_steps = max_plan_steps
 
@@ -100,7 +101,7 @@ class Planner:
         response = await self._model.chat("planner", messages, max_tokens=1024)
         return self._parse_plan(response.content)
 
-    def _parse_plan(self, content: str) -> tuple[list[str], str]:
+    # def _parse_plan(self, content: str) -> tuple[list[str], str]:
         """Extract the plan list and reasoning from the model response."""
         # Try to parse as JSON first.
         try:
@@ -129,3 +130,64 @@ class Planner:
             if stripped and not stripped.startswith("{") and not stripped.startswith('"'):
                 plan.append(stripped)
         return plan[: self._max_steps] or ["Attempt the goal directly."], ""
+    def _parse_plan(self, content: str) -> tuple[list[str], str]:
+        """Extract a valid, non-empty plan from the model response."""
+
+        text = (content or "").strip()
+
+        # Handle Markdown code fences.
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+            if text.rstrip().endswith("```"):
+                text = text.rstrip()[:-3]
+            text = text.strip()
+
+        # First attempt: JSON response.
+        try:
+            data = json.loads(text)
+
+            if isinstance(data, dict):
+                plan = data.get("plan", [])
+                reasoning = data.get("reasoning", "")
+
+                if isinstance(plan, list):
+                    valid_plan = [
+                        step.strip()
+                        for step in plan
+                        if isinstance(step, str) and step.strip()
+                    ]
+
+                    if valid_plan:
+                        return valid_plan[:self._max_steps], str(reasoning or "")
+
+        except (json.JSONDecodeError, AttributeError, TypeError):
+            pass
+
+        # Second attempt: numbered-list response.
+        logger.warning("Could not parse planner JSON; trying numbered-list parsing.")
+
+        plan = []
+
+        # for line in text.splitlines():
+        #     stripped = line.strip().lstrip("0123456789.-) ")
+
+        #     if stripped and not stripped.startswith(("{", '"', "}")):
+        #         plan.append(stripped)
+        for line in text.splitlines():
+            match = re.match(
+                r"^\s*(?:\d+[.)]|[-*])\s+(.+?)\s*$",
+                line
+            )
+
+            if match:
+                step = match.group(1).strip()
+                if step:
+                    plan.append(step)
+        if plan:
+            return plan[:self._max_steps], "Parsed from numbered-list fallback."
+
+        # Never silently convert invalid output into a fake plan.
+        raise ValueError(
+            "Planner returned an empty or invalid plan. "
+            "Expected a non-empty JSON plan or numbered list."
+        )

@@ -34,6 +34,9 @@ rag = [
 [project.scripts]
 xalgv = "local_agent.main:cli_main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["local_agent", "eval"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

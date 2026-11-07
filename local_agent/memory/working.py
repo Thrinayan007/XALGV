@@ -56,12 +56,20 @@ class WorkingMemory:
         self._messages.append(msg)
         self._compact_if_needed()
 
-    def add_tool_result(self, tool_call_id: str, content: str) -> None:
+    # def add_tool_result(self, tool_call_id: str, content: str) -> None:
+    #     """Append a tool result message."""
+    #     self._messages.append({
+    #         "role": "tool",
+    #         "content": self._truncate(content, max_chars=4000),
+    #         "tool_call_id": tool_call_id,
+    #     })
+    #     self._compact_if_needed()
+    def add_tool_result(self, tool_name: str, content: str) -> None:
         """Append a tool result message."""
         self._messages.append({
             "role": "tool",
+            "tool_name": tool_name,
             "content": self._truncate(content, max_chars=4000),
-            "tool_call_id": tool_call_id,
         })
         self._compact_if_needed()
 
