@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 import re
 
 from local_agent.core.state import AgentState
@@ -28,22 +27,24 @@ Web & Search:
   web_search — search the public web via SearXNG
 
 Browser (Playwright inside sandbox):
-  browser_navigate — load a URL
-  browser_get_content — get page content (a11y tree / text / html)
-  browser_click — click an element by selector or accessible name
-  browser_type — type text into an input field
-  browser_screenshot — screenshot the page (fallback, prefer a11y tree)
+  browser_open, browser_observe, browser_click, browser_type, browser_press,
+  browser_scroll, browser_tabs, browser_wait, browser_screenshot
+  browser_run — up to 20 deterministic actions in one bounded macro
 
 Document Intelligence (RAG):
   ingest_document — parse and embed a document (PDF, DOCX, HTML, TXT)
   query_documents — semantic search over ingested documents with citations
 
 Design principle: "Structure first, pixels second."  Prefer the
-accessibility tree (browser_get_content mode=a11y) over screenshots.
-Only use browser_screenshot when the a11y tree is insufficient.
+browser_observe refs over guessed selectors. Capture screenshots when the goal
+requires evidence; group deterministic open/scroll/screenshot steps in browser_run.
 
-Given a goal and the current state, produce a plan of at most 16 steps.
-Each step must be a single, concrete, verifiable tool action.
+Given a goal and the current state, produce a concise plan of at most 8 objectives.
+Each objective may need several tool actions. Keep each description under 160 characters.
+Never omit screenshots or other deliverables explicitly requested by the user.
+When a URL and screenshot paths are already supplied, use ONE objective: run a
+single browser_run containing open, screenshot, then alternating scroll/screenshot.
+Do not add observation or separate navigation objectives to that known sequence.
 
 Respond with ONLY a JSON object:
 {
@@ -101,35 +102,6 @@ class Planner:
         response = await self._model.chat("planner", messages, max_tokens=1024)
         return self._parse_plan(response.content)
 
-    # def _parse_plan(self, content: str) -> tuple[list[str], str]:
-        """Extract the plan list and reasoning from the model response."""
-        # Try to parse as JSON first.
-        try:
-            # Handle markdown code fences.
-            text = content.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-                if text.endswith("```"):
-                    text = text[:-3]
-                text = text.strip()
-
-            data = json.loads(text)
-            plan = data.get("plan", [])
-            reasoning = data.get("reasoning", "")
-            if isinstance(plan, list) and all(isinstance(s, str) for s in plan):
-                return plan[: self._max_steps], reasoning
-        except (json.JSONDecodeError, AttributeError):
-            pass
-
-        # Fallback: treat numbered lines as plan steps.
-        logger.warning("Could not parse plan as JSON; falling back to line parsing.")
-        lines = content.strip().splitlines()
-        plan: list[str] = []
-        for line in lines:
-            stripped = line.strip().lstrip("0123456789.-) ")
-            if stripped and not stripped.startswith("{") and not stripped.startswith('"'):
-                plan.append(stripped)
-        return plan[: self._max_steps] or ["Attempt the goal directly."], ""
     def _parse_plan(self, content: str) -> tuple[list[str], str]:
         """Extract a valid, non-empty plan from the model response."""
 

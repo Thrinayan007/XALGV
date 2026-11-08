@@ -1,0 +1,449 @@
+{
+  "model": "qwen3.5:9b",
+  "repeats": 3,
+  "mode": "real-model-real-chromium-local-fixtures",
+  "context_length": 8192,
+  "results": [
+    {
+      "trial": "five_captures-0-9e643a94",
+      "scenario": "five_captures",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully executed browser_run to open http://127.0.0.1:50270/profile.html, took the first viewport screenshot, then alternated scrolling down 500 pixels and taking screenshots four times. All five PNG files were created at the specified paths: five_captures-0-9e643a94/page-0.png through page-4.png.",
+      "seconds": 99.89926129998639,
+      "model_calls": 3,
+      "prompt_tokens": 6214,
+      "generated_tokens": 572,
+      "tools": [
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 38.54108280001674,
+          "prompt_tokens": 576,
+          "generated_tokens": 131,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 46.9572345999768,
+          "prompt_tokens": 2525,
+          "generated_tokens": 354,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 12.81925170001341,
+          "prompt_tokens": 3113,
+          "generated_tokens": 87,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "f2af60c2cfb64876ba224034813d076d",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:50270/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-9e643a94/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-9e643a94/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-9e643a94/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-9e643a94/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-9e643a94/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      },
+      "workflow_correct": true,
+      "three_call_target_met": true
+    },
+    {
+      "trial": "five_captures-1-8e3e1420",
+      "scenario": "five_captures",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully executed browser_run with 10 steps: opened http://127.0.0.1:50270/profile.html, took first viewport screenshot (page-0.png), then alternated scroll down 500px and screenshot four times. All five PNG files created at the specified paths in five_captures-1-8e3e1420/.",
+      "seconds": 76.05774040002143,
+      "model_calls": 3,
+      "prompt_tokens": 6206,
+      "generated_tokens": 564,
+      "tools": [
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 15.913555799983442,
+          "prompt_tokens": 576,
+          "generated_tokens": 125,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 46.58774650003761,
+          "prompt_tokens": 2521,
+          "generated_tokens": 354,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 12.128775999997742,
+          "prompt_tokens": 3109,
+          "generated_tokens": 85,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "3c747c0437d04e31880861971c2f51c3",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:50270/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-8e3e1420/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-8e3e1420/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-8e3e1420/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-8e3e1420/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-8e3e1420/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      },
+      "workflow_correct": true,
+      "three_call_target_met": true
+    },
+    {
+      "trial": "five_captures-2-d70e43b1",
+      "scenario": "five_captures",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "All five screenshot files created successfully at the specified paths: page-0.png through page-4.png in five_captures-2-d70e43b1/.",
+      "seconds": 69.53968420001911,
+      "model_calls": 3,
+      "prompt_tokens": 6179,
+      "generated_tokens": 517,
+      "tools": [
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 15.721379499998875,
+          "prompt_tokens": 571,
+          "generated_tokens": 129,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 45.88646539999172,
+          "prompt_tokens": 2515,
+          "generated_tokens": 349,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 6.463447600021027,
+          "prompt_tokens": 3093,
+          "generated_tokens": 39,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "699279074b5b41748f7e046cbf94be84",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:50270/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-d70e43b1/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-d70e43b1/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-d70e43b1/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-d70e43b1/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-d70e43b1/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      },
+      "workflow_correct": true,
+      "three_call_target_met": true
+    }
+  ],
+  "status": "complete",
+  "success_rate": 1.0,
+  "target_success_rate": 0.9,
+  "target_met": true,
+  "capture_three_call_target_met": true,
+  "median_seconds": 76.05774040002143,
+  "p95_seconds": 76.05774040002143,
+  "median_model_calls": 3,
+  "running_models": [
+    {
+      "name": "qwen3.5:9b",
+      "model": "qwen3.5:9b",
+      "size": 6398672891,
+      "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen35",
+        "families": [
+          "qwen35"
+        ],
+        "parameter_size": "9.0B",
+        "quantization_level": "Q4_K_M"
+      },
+      "expires_at": "2026-11-08T12:36:37.3710171+05:30",
+      "size_vram": 3490950674,
+      "context_length": 8192,
+      "runner": "llamacpp"
+    }
+  ]
+}

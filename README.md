@@ -6,6 +6,16 @@ A local-first, sandboxed, multimodal computer-using agent with dynamic planning,
 
 ## Architecture
 
+XBrowser includes persistent sessions and snapshot-scoped element targeting. See
+[session architecture and setup](docs/xbrowser-foundation.md) and
+[observations, references, and current limits](docs/xbrowser-observations.md).
+The [execution architecture](docs/xbrowser-architecture.md) and
+[bounded workflow API](docs/xbrowser-execution.md) cover the nine actions, macros,
+agent progress and budgets. See the [v1 completion and validation report](docs/xbrowser-validation.md)
+for the implemented scope, recorded results, and operating limits.
+Trusted completion criteria, network controls, approvals, token budgeting, and
+visual fallback are documented in [XBrowser security and verification](docs/xbrowser-security.md).
+
 ```
 User Goal → Planner → [Observe → Decide → Permission Check → Act → Verify] → Done?
                                                                       ↑              |

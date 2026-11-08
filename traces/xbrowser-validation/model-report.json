@@ -1,0 +1,1195 @@
+{
+  "model": "qwen3.5:9b",
+  "repeats": 3,
+  "mode": "real-model-real-chromium-local-fixtures",
+  "context_length": 8192,
+  "results": [
+    {
+      "trial": "navigation-0-2a28943b",
+      "scenario": "navigation",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Opened http://127.0.0.1:59858/profile.html successfully. The page title is \"XBrowser evaluation profile\" which contains \"Evaluation profile\" as required by the acceptance criteria.",
+      "seconds": 102.6475039999932,
+      "model_calls": 5,
+      "prompt_tokens": 9385,
+      "generated_tokens": 539,
+      "tools": [
+        "browser_open",
+        "browser_wait",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 48.64380110002821,
+          "prompt_tokens": 354,
+          "generated_tokens": 168,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 8.639759200043045,
+          "prompt_tokens": 2030,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.853207199950702,
+          "prompt_tokens": 2138,
+          "generated_tokens": 71,
+          "tools": [
+            "browser_wait"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.468112299975473,
+          "prompt_tokens": 2291,
+          "generated_tokens": 70,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 24.942443900043145,
+          "prompt_tokens": 2572,
+          "generated_tokens": 186,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "dc752d58ec834a4884c590e4654635e1",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Evaluation profile"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "reference_form-0-f807e331",
+      "scenario": "reference_form",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully completed all steps: opened http://127.0.0.1:59858/profile.html, typed 'Ada Lovelace' into Display name field, clicked Save profile button, and verified that 'Saved Ada Lovelace' appears on the page. Both trusted acceptance criteria are satisfied.",
+      "seconds": 135.32674619997852,
+      "model_calls": 12,
+      "prompt_tokens": 30913,
+      "generated_tokens": 891,
+      "tools": [
+        "browser_open",
+        "browser_observe",
+        "browser_type",
+        "browser_click",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 27.969549100031145,
+          "prompt_tokens": 370,
+          "generated_tokens": 213,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 6.061592700018082,
+          "prompt_tokens": 2114,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 8.53463599999668,
+          "prompt_tokens": 2222,
+          "generated_tokens": 60,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 8.311041300010402,
+          "prompt_tokens": 2358,
+          "generated_tokens": 52,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.462451700004749,
+          "prompt_tokens": 2603,
+          "generated_tokens": 58,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 11.739903500012588,
+          "prompt_tokens": 2715,
+          "generated_tokens": 80,
+          "tools": [
+            "browser_type"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 8.334801100019831,
+          "prompt_tokens": 2822,
+          "generated_tokens": 53,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 8.671857300039846,
+          "prompt_tokens": 2930,
+          "generated_tokens": 53,
+          "tools": [
+            "browser_click"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.934325299982447,
+          "prompt_tokens": 3022,
+          "generated_tokens": 62,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 9.090906299999915,
+          "prompt_tokens": 3139,
+          "generated_tokens": 52,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 14.341728999977931,
+          "prompt_tokens": 3235,
+          "generated_tokens": 96,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 11.674876699980814,
+          "prompt_tokens": 3383,
+          "generated_tokens": 68,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "953d18c2c8ff4f35bcc2d4e3088c1c10",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Saved Ada Lovelace"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "five_captures-0-b3a9e8d2",
+      "scenario": "five_captures",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully opened http://127.0.0.1:59858/profile.html and captured exactly five PNG screenshots at the specified paths with 500px scrolls between captures.",
+      "seconds": 125.52922230004333,
+      "model_calls": 5,
+      "prompt_tokens": 11175,
+      "generated_tokens": 921,
+      "tools": [
+        "browser_run",
+        "browser_observe",
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 20.053096499992535,
+          "prompt_tokens": 474,
+          "generated_tokens": 157,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 8.142871499992907,
+          "prompt_tokens": 2303,
+          "generated_tokens": 61,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 8.1825665999786,
+          "prompt_tokens": 2403,
+          "generated_tokens": 61,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 55.2288754999754,
+          "prompt_tokens": 2664,
+          "generated_tokens": 406,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 32.03459199995268,
+          "prompt_tokens": 3331,
+          "generated_tokens": 236,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "9a4d466a109443e9875a00930e8df2b2",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-b3a9e8d2/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-b3a9e8d2/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-b3a9e8d2/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-b3a9e8d2/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-b3a9e8d2/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "navigation-1-c9c6c49e",
+      "scenario": "navigation",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Opened http://127.0.0.1:59858/profile.html successfully. The page title is \"XBrowser evaluation profile\" which contains \"Evaluation profile\" as required by the acceptance criteria.",
+      "seconds": 81.43832549999934,
+      "model_calls": 5,
+      "prompt_tokens": 9384,
+      "generated_tokens": 539,
+      "tools": [
+        "browser_open",
+        "browser_wait",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 22.67329270002665,
+          "prompt_tokens": 354,
+          "generated_tokens": 168,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 6.125531499972567,
+          "prompt_tokens": 2030,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 12.363442400004715,
+          "prompt_tokens": 2138,
+          "generated_tokens": 71,
+          "tools": [
+            "browser_wait"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 11.06494810001459,
+          "prompt_tokens": 2291,
+          "generated_tokens": 70,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 27.64751769998111,
+          "prompt_tokens": 2571,
+          "generated_tokens": 186,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "9aab566438874d4bb16941adc84f6550",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Evaluation profile"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "reference_form-1-6c295d24",
+      "scenario": "reference_form",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully completed all steps: opened http://127.0.0.1:59858/profile.html, typed 'Ada Lovelace' into Display name field, clicked Save profile button, and verified that 'Saved Ada Lovelace' appears on the page. All acceptance criteria passed.",
+      "seconds": 141.681670400023,
+      "model_calls": 12,
+      "prompt_tokens": 30934,
+      "generated_tokens": 908,
+      "tools": [
+        "browser_open",
+        "browser_observe",
+        "browser_type",
+        "browser_click",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 28.83615660003852,
+          "prompt_tokens": 370,
+          "generated_tokens": 213,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 6.521835699968506,
+          "prompt_tokens": 2114,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 10.297263399988879,
+          "prompt_tokens": 2222,
+          "generated_tokens": 60,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 7.620747799985111,
+          "prompt_tokens": 2358,
+          "generated_tokens": 52,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 8.496858400001656,
+          "prompt_tokens": 2603,
+          "generated_tokens": 58,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 11.386217399965972,
+          "prompt_tokens": 2715,
+          "generated_tokens": 80,
+          "tools": [
+            "browser_type"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 8.968430700013414,
+          "prompt_tokens": 2822,
+          "generated_tokens": 53,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 9.076869399985299,
+          "prompt_tokens": 2930,
+          "generated_tokens": 53,
+          "tools": [
+            "browser_click"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 10.244159299996682,
+          "prompt_tokens": 3022,
+          "generated_tokens": 62,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 9.657580200000666,
+          "prompt_tokens": 3139,
+          "generated_tokens": 52,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 18.098109500017017,
+          "prompt_tokens": 3236,
+          "generated_tokens": 115,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 11.10760059999302,
+          "prompt_tokens": 3403,
+          "generated_tokens": 66,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "6a24f6db7a0d469682d4fb23ad52612a",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Saved Ada Lovelace"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "five_captures-1-58743fd6",
+      "scenario": "five_captures",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully opened http://127.0.0.1:59858/profile.html and captured exactly 5 PNG screenshots at the specified paths with 500px scrolls between captures. All artifacts verified in five_captures-1-58743fd6 directory.",
+      "seconds": 134.19034039997496,
+      "model_calls": 5,
+      "prompt_tokens": 11238,
+      "generated_tokens": 880,
+      "tools": [
+        "browser_run",
+        "browser_observe",
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 23.07458419998875,
+          "prompt_tokens": 474,
+          "generated_tokens": 164,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 10.50691390002612,
+          "prompt_tokens": 2317,
+          "generated_tokens": 61,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 12.899418200016953,
+          "prompt_tokens": 2417,
+          "generated_tokens": 77,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 57.314636300026905,
+          "prompt_tokens": 2694,
+          "generated_tokens": 383,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 27.774382299976423,
+          "prompt_tokens": 3336,
+          "generated_tokens": 195,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "5a576eeff7704732be5afb0a000625bd",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-58743fd6/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-58743fd6/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-58743fd6/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-58743fd6/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-58743fd6/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "navigation-2-a61d1aee",
+      "scenario": "navigation",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Opened http://127.0.0.1:59858/profile.html, observed the page, and reported its title as \"XBrowser evaluation profile\".",
+      "seconds": 65.66905650001718,
+      "model_calls": 5,
+      "prompt_tokens": 9384,
+      "generated_tokens": 471,
+      "tools": [
+        "browser_open",
+        "browser_wait",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 22.09462970000459,
+          "prompt_tokens": 354,
+          "generated_tokens": 168,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 5.767568300012499,
+          "prompt_tokens": 2030,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 10.089228400029242,
+          "prompt_tokens": 2138,
+          "generated_tokens": 71,
+          "tools": [
+            "browser_wait"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 10.804018300026655,
+          "prompt_tokens": 2291,
+          "generated_tokens": 70,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 15.99075359996641,
+          "prompt_tokens": 2571,
+          "generated_tokens": 118,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "d4b7f417645a4d23ace9f7ad6c1a03a4",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Evaluation profile"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "reference_form-2-1ae6081b",
+      "scenario": "reference_form",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully completed all steps: opened http://127.0.0.1:59858/profile.html, typed 'Ada Lovelace' into Display name field, clicked Save profile button, and verified that 'Saved Ada Lovelace' appears on the page. Both trusted acceptance criteria have been met.",
+      "seconds": 135.08126629999606,
+      "model_calls": 12,
+      "prompt_tokens": 30915,
+      "generated_tokens": 892,
+      "tools": [
+        "browser_open",
+        "browser_observe",
+        "browser_type",
+        "browser_click",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 28.739195799978916,
+          "prompt_tokens": 370,
+          "generated_tokens": 213,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 6.219678400026169,
+          "prompt_tokens": 2114,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.049779099994339,
+          "prompt_tokens": 2222,
+          "generated_tokens": 60,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 7.88036439998541,
+          "prompt_tokens": 2358,
+          "generated_tokens": 52,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.805321699997876,
+          "prompt_tokens": 2604,
+          "generated_tokens": 58,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 12.534815299964976,
+          "prompt_tokens": 2716,
+          "generated_tokens": 80,
+          "tools": [
+            "browser_type"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 8.28064050001558,
+          "prompt_tokens": 2823,
+          "generated_tokens": 53,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 8.204754999955185,
+          "prompt_tokens": 2931,
+          "generated_tokens": 53,
+          "tools": [
+            "browser_click"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.311447499960195,
+          "prompt_tokens": 3023,
+          "generated_tokens": 62,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 8.183820199978072,
+          "prompt_tokens": 3140,
+          "generated_tokens": 52,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 14.447021699976176,
+          "prompt_tokens": 3233,
+          "generated_tokens": 96,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 11.199917399964761,
+          "prompt_tokens": 3381,
+          "generated_tokens": 69,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "ea0e9415d85a4a5e8c06e66b0e4b6c83",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Saved Ada Lovelace"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    },
+    {
+      "trial": "five_captures-2-50aa7ba8",
+      "scenario": "five_captures",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Opened http://127.0.0.1:59858/profile.html and captured exactly five PNG screenshots at the specified paths with 500px scrolling between captures. All five PNG files exist in the five_captures-2-50aa7ba8 directory.",
+      "seconds": 150.49237549997633,
+      "model_calls": 5,
+      "prompt_tokens": 11284,
+      "generated_tokens": 1069,
+      "tools": [
+        "browser_run",
+        "browser_observe",
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 21.82814200001303,
+          "prompt_tokens": 469,
+          "generated_tokens": 162,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 8.756500100018457,
+          "prompt_tokens": 2305,
+          "generated_tokens": 61,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 10.063513099972624,
+          "prompt_tokens": 2405,
+          "generated_tokens": 72,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 65.076034000027,
+          "prompt_tokens": 2673,
+          "generated_tokens": 485,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 42.63936480000848,
+          "prompt_tokens": 3432,
+          "generated_tokens": 289,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "f7ae9e3ce8cb490c868fda7f09a0948d",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59858/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-50aa7ba8/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-50aa7ba8/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-50aa7ba8/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-50aa7ba8/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-2-50aa7ba8/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    }
+  ],
+  "status": "complete",
+  "success_rate": 1.0,
+  "target_success_rate": 0.9,
+  "target_met": true,
+  "median_seconds": 134.19034039997496,
+  "p95_seconds": 141.681670400023,
+  "median_model_calls": 5,
+  "running_models": [
+    {
+      "name": "qwen3.5:9b",
+      "model": "qwen3.5:9b",
+      "size": 6372521407,
+      "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen35",
+        "families": [
+          "qwen35"
+        ],
+        "parameter_size": "9.0B",
+        "quantization_level": "Q4_K_M"
+      },
+      "expires_at": "2026-11-08T12:21:06.7335394+05:30",
+      "size_vram": 3105598995,
+      "context_length": 8192,
+      "runner": "llamacpp"
+    }
+  ]
+}

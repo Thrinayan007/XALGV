@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "checks": {
+    "deployed_source_matches": true,
+    "api_health": true,
+    "novnc_html": true,
+    "novnc_rfb_bridge": true,
+    "xvfb_display": true,
+    "headful_navigation": true,
+    "tabs": true,
+    "switch": true,
+    "refs": true,
+    "actual_token_budget": true,
+    "marked_screenshot": true,
+    "task_acceptance": true,
+    "metadata_ip_blocked": true,
+    "restart": true,
+    "stale_tab_rejected": true
+  },
+  "screenshot": [
+    "/workspace/xbrowser-validation/5e112bb024f04fe9991bcc7ff6364836.png"
+  ],
+  "observation_tokens": 139,
+  "deployment": "Docker Chromium headful Xvfb noVNC"
+}

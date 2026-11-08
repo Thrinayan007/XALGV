@@ -9,5 +9,11 @@ build/
 data/
 traces/*.jsonl
 traces/*.tmp
+**/.xbrowser/
+.cache/
+traces/xbrowser-validation/workspace/
+traces/xbrowser-validation/*.db*
+traces/xbrowser-validation/*.log
+**/.agent_scripts/
 
 

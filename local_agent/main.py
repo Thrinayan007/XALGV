@@ -30,17 +30,12 @@ logger = logging.getLogger("xalgv")
 async def cmd_run(args: argparse.Namespace) -> int:
     """Run the agent with a goal."""
     from local_agent.core.loop import AgentLoop
+    from local_agent.core.task_verification import TaskVerifier
     from local_agent.memory.store import MemoryStore
     from local_agent.models import ModelManager
     from local_agent.sandbox.client import SandboxClient
     from local_agent.security.permissions import PermissionPolicy, PermissionTier
-    from local_agent.tools.browser import (
-        BrowserClickTool,
-        BrowserGetContentTool,
-        BrowserNavigateTool,
-        BrowserScreenshotTool,
-        BrowserTypeTool,
-    )
+    from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
     from local_agent.tools.python_exec import PythonExecTool
     from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
@@ -63,11 +58,14 @@ async def cmd_run(args: argparse.Namespace) -> int:
             model_manager=model_mgr,
             vector_store=VectorStore(config.data_dir / "vectordb"),
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - Optional RAG can fail during import or initialization.
         logger.warning("RAG pipeline unavailable — document tools will return errors.")
 
     # Build tool registry.
-    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.NETWORK)
+    allow_execution = getattr(args, "allow_execution", False)
+    if allow_execution and not sandbox._admin_token:
+        raise ValueError("--allow-execution requires XALGV_SANDBOX_ADMIN_TOKEN and matching SANDBOX_ADMIN_TOKEN in the container")
+    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.SYSTEM if allow_execution else PermissionTier.NETWORK)
     registry = ToolRegistry(policy)
     registry.register_many(
         # Phase 1 — file & shell.
@@ -81,23 +79,26 @@ async def cmd_run(args: argparse.Namespace) -> int:
             trace_dir=str(config.trace_dir),
         ),
         # Phase 2 — browser automation.
-        BrowserNavigateTool(sandbox),
-        BrowserGetContentTool(sandbox),
-        BrowserClickTool(sandbox),
-        BrowserTypeTool(sandbox),
-        BrowserScreenshotTool(sandbox),
+        *browser_tools(sandbox, vision_model=model_mgr),
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),
     )
 
-    loop = AgentLoop(config, model_mgr, registry, memory)
+    loop = AgentLoop(config, model_mgr, registry, memory, task_verifier=TaskVerifier(sandbox))
 
     try:
-        result = await loop.run(args.goal)
+        acceptance_path = getattr(args, "acceptance", None)
+        checks = None
+        if acceptance_path:
+            from pathlib import Path
+            data = json.loads(Path(acceptance_path).read_text(encoding="utf-8"))
+            checks = data["checks"] if isinstance(data, dict) else data
+        result = await loop.run(args.goal, acceptance_checks=checks)
         print(f"\n{'='*60}")
         print(f"Run ID:  {result.run_id}")
         print(f"Status:  {result.status.value}")
+        print(f"Task checks: {result.metadata.get('task_verification', {}).get('status', 'not_evaluated')}")
         print(f"Steps:   {len(result.steps)}")
         print(f"Summary: {result.summary}")
         print(f"{'='*60}")
@@ -113,17 +114,12 @@ async def cmd_eval(args: argparse.Namespace) -> int:
     """Run the evaluation harness."""
     from eval.harness import EvalHarness
     from local_agent.core.loop import AgentLoop
+    from local_agent.core.task_verification import TaskVerifier
     from local_agent.memory.store import MemoryStore
     from local_agent.models import ModelManager
     from local_agent.sandbox.client import SandboxClient
     from local_agent.security.permissions import PermissionPolicy, PermissionTier
-    from local_agent.tools.browser import (
-        BrowserClickTool,
-        BrowserGetContentTool,
-        BrowserNavigateTool,
-        BrowserScreenshotTool,
-        BrowserTypeTool,
-    )
+    from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
     from local_agent.tools.python_exec import PythonExecTool
     from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
@@ -146,10 +142,13 @@ async def cmd_eval(args: argparse.Namespace) -> int:
             model_manager=model_mgr,
             vector_store=VectorStore(config.data_dir / "vectordb"),
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - Optional RAG can fail during import or initialization.
         logger.warning("RAG pipeline unavailable — document tools will return errors.")
 
-    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.NETWORK)
+    allow_execution = getattr(args, "allow_execution", False)
+    if allow_execution and not sandbox._admin_token:
+        raise ValueError("--allow-execution requires configured sandbox administration credentials")
+    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.SYSTEM if allow_execution else PermissionTier.NETWORK)
     registry = ToolRegistry(policy)
     registry.register_many(
         # Phase 1 — file & shell.
@@ -163,17 +162,13 @@ async def cmd_eval(args: argparse.Namespace) -> int:
             trace_dir=str(config.trace_dir),
         ),
         # Phase 2 — browser automation.
-        BrowserNavigateTool(sandbox),
-        BrowserGetContentTool(sandbox),
-        BrowserClickTool(sandbox),
-        BrowserTypeTool(sandbox),
-        BrowserScreenshotTool(sandbox),
+        *browser_tools(sandbox, vision_model=model_mgr),
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),
     )
 
-    agent_loop = AgentLoop(config, model_mgr, registry, memory)
+    agent_loop = AgentLoop(config, model_mgr, registry, memory, task_verifier=TaskVerifier(sandbox))
     harness = EvalHarness()
 
     try:
@@ -181,7 +176,7 @@ async def cmd_eval(args: argparse.Namespace) -> int:
         output = config.trace_dir / "eval_report.json"
         harness.save_report(report, output)
         print(f"\n{'='*60}")
-        print(f"Evaluation Report")
+        print("Evaluation Report")
         print(f"{'='*60}")
         print(f"Total:   {report.total_tasks}")
         print(f"Passed:  {report.passed}")
@@ -264,10 +259,13 @@ def cli_main() -> int:
     # run
     run_parser = subparsers.add_parser("run", help="Execute the agent with a goal.")
     run_parser.add_argument("goal", help="The goal for the agent to accomplish.")
+    run_parser.add_argument("--acceptance", help="Trusted JSON file of deterministic acceptance checks.")
+    run_parser.add_argument("--allow-execution", action="store_true", help="Trust shell/Python SYSTEM tools for this run; requires configured sandbox admin credentials.")
 
     # eval
     eval_parser = subparsers.add_parser("eval", help="Run the evaluation harness.")
     eval_parser.add_argument("--category", help="Only run tasks of this category.")
+    eval_parser.add_argument("--allow-execution", action="store_true", help="Trust shell/Python SYSTEM tools for evaluation; requires sandbox admin credentials.")
 
     # search
     search_parser = subparsers.add_parser("search", help="Run a web search via SearXNG.")

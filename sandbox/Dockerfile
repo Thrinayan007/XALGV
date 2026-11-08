@@ -42,6 +42,9 @@ RUN mkdir -p /ms-playwright \
 # ── Tool server ──────────────────────────────────────────────────────────
 COPY tool_server.py /opt/tool_server/tool_server.py
 COPY browser_server.py /opt/tool_server/browser_server.py
+COPY xbrowser /opt/tool_server/xbrowser
+RUN python3 -c "import hashlib,json,pathlib,urllib.request; config=json.loads(pathlib.Path('/opt/tool_server/xbrowser/tokenizer_config.json').read_text()); data=urllib.request.urlopen(config['url'],timeout=120).read(); assert hashlib.sha256(data).hexdigest()==config['sha256'], 'Tokenizer checksum mismatch'; pathlib.Path('/opt/tool_server/xbrowser-tokenizer.json').write_bytes(data)"
+ENV XBROWSER_TOKENIZER_PATH=/opt/tool_server/xbrowser-tokenizer.json
 COPY entrypoint.sh /opt/tool_server/entrypoint.sh
 RUN sed -i 's/\r$//' /opt/tool_server/entrypoint.sh && chmod +x /opt/tool_server/entrypoint.sh
 

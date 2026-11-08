@@ -1,0 +1,83 @@
+{
+  "date": "2026-11-08",
+  "status": "v1-validation-complete",
+  "tests": {
+    "passed": 230,
+    "seconds": 116.1
+  },
+  "model": "qwen3.5:9b Q4_K_M",
+  "context_length": 8192,
+  "temperature": 0,
+  "hardware": "NVIDIA RTX 3050 Laptop GPU, 6144 MiB VRAM",
+  "baseline": {
+    "trials": 9,
+    "passed": 9,
+    "median_seconds": 134.19034039997496,
+    "p95_seconds_nearest_rank": 150.49237549997633,
+    "model_calls": [
+      5,
+      12,
+      5,
+      5,
+      12,
+      5,
+      5,
+      12,
+      5
+    ]
+  },
+  "optimized_capture": {
+    "trials": 3,
+    "passed": 3,
+    "median_seconds": 76.05774040002143,
+    "p95_seconds_nearest_rank": 99.89926129998639,
+    "model_calls": [
+      3,
+      3,
+      3
+    ]
+  },
+  "capture_sequence_and_viewport_checks_passed": true,
+  "capture_three_model_call_target_met": true,
+  "deployment": {
+    "passed": true,
+    "checks": {
+      "deployed_source_matches": true,
+      "api_health": true,
+      "novnc_html": true,
+      "novnc_rfb_bridge": true,
+      "xvfb_display": true,
+      "headful_navigation": true,
+      "tabs": true,
+      "switch": true,
+      "refs": true,
+      "actual_token_budget": true,
+      "marked_screenshot": true,
+      "task_acceptance": true,
+      "metadata_ip_blocked": true,
+      "restart": true,
+      "stale_tab_rejected": true
+    },
+    "screenshot": [
+      "/workspace/xbrowser-validation/5e112bb024f04fe9991bcc7ff6364836.png"
+    ],
+    "observation_tokens": 139,
+    "deployment": "Docker Chromium headful Xvfb noVNC"
+  },
+  "real_model_vision_passed": true,
+  "normal_configuration": {
+    "final_api_healthy": true,
+    "fixture_exception_removed": true,
+    "process_environment_blocked": true,
+    "shell_without_admin_blocked": true
+  },
+  "limitations": [
+    "Controlled local fixtures, not a broad open-web success-rate estimate.",
+    "Sensitive-control recognition is heuristic; websites can have side effects on GET.",
+    "SYSTEM-authorized arbitrary code is a separate trust boundary."
+  ],
+  "retained_diagnostics": [
+    "model-report-before-completion-fix.json",
+    "capture-contention-report.json"
+  ]
+}

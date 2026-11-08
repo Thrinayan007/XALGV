@@ -12,16 +12,17 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 class RunStatus(str, Enum):
@@ -50,6 +51,7 @@ class StepRecord:
     verification_message: str = ""
     error: str | None = None
     timestamp: str = field(default_factory=_utc_now)
+    result_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -138,6 +140,9 @@ class MemoryStore:
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(steps)")}
+            if "result_metadata" not in columns:
+                conn.execute("ALTER TABLE steps ADD COLUMN result_metadata TEXT NOT NULL DEFAULT '{}'")
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -182,6 +187,13 @@ class MemoryStore:
         with self._connect() as conn:
             conn.execute("UPDATE runs SET plan=? WHERE run_id=?", (json.dumps(plan), run_id))
 
+    def update_run_metadata(self, run_id: str, values: dict[str, Any]) -> None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT metadata FROM runs WHERE run_id=?", (run_id,)).fetchone()
+            metadata = json.loads(row["metadata"])
+            metadata.update(values)
+            conn.execute("UPDATE runs SET metadata=? WHERE run_id=?", (json.dumps(metadata), run_id))
+
     def get_run(self, run_id: str) -> RunRecord | None:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
@@ -224,14 +236,14 @@ class MemoryStore:
                 "INSERT INTO steps "
                 "(run_id, step_index, action_type, tool_name, tool_params, "
                 "observation, decision, result_output, result_success, "
-                "verification_status, verification_message, error, timestamp) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "verification_status, verification_message, error, timestamp, result_metadata) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (run_id, step.step_index, step.action_type, step.tool_name,
                  json.dumps(step.tool_params) if step.tool_params else None,
                  step.observation, step.decision, step.result_output,
                  int(step.result_success) if step.result_success is not None else None,
                  step.verification_status, step.verification_message,
-                 step.error, step.timestamp),
+                 step.error, step.timestamp, json.dumps(step.result_metadata)),
             )
 
     def _load_steps(self, conn: sqlite3.Connection, run_id: str) -> list[StepRecord]:
@@ -252,6 +264,7 @@ class MemoryStore:
                 verification_message=r["verification_message"],
                 error=r["error"],
                 timestamp=r["timestamp"],
+                result_metadata=json.loads(r["result_metadata"]),
             )
             for r in rows
         ]

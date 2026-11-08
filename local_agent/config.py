@@ -17,8 +17,7 @@ class ModelRoleConfig:
     thinking: bool = False  # Use /think mode for this role
 
 
-# Sensible defaults for an RTX 5060 Laptop (8 GB VRAM).
-# Sensible defaults for an RTX 5060 Laptop (8 GB VRAM) as per project specification.
+# Tool-use roles share one model/context to avoid role-switch reloads.
 # DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
 #     "planner": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.6, thinking=True),
 #     "executor": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
@@ -29,18 +28,18 @@ class ModelRoleConfig:
 # }
 DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
     "planner": ModelRoleConfig(
-        model="qwen3.5:9b-q4_K_M",
-        context_length=4096,
-        temperature=0.6,
+        model="qwen3.5:9b",
+        context_length=8192,
+        temperature=0.0,
         thinking=False
     ),
 
     "executor": ModelRoleConfig(
-        model="qwen3.5:9b-q4_K_M",
+        model="qwen3.5:9b",
         # context_length=4096,
         # temperature=0.3
         context_length=8192,
-        temperature=0.3,
+        temperature=0.0,
         thinking=False
     ),
 
@@ -51,9 +50,9 @@ DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
     ),
 
     "vision": ModelRoleConfig(
-        model="qwen2.5-vl:7b",
-        context_length=4096,
-        temperature=0.3
+        model="qwen3.5:9b",
+        context_length=8192,
+        temperature=0.0
     ),
 
     "embed": ModelRoleConfig(

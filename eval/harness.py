@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shlex
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -95,6 +96,8 @@ class EvalHarness:
                 data = json.loads(path.read_text(encoding="utf-8"))
                 file_tasks = data if isinstance(data, list) else data.get("tasks", [data])
                 for item in file_tasks:
+                    if not item.get("checkers") and item.get("verification"):
+                        item["checkers"] = [item["verification"]]
                     task = TaskDefinition(**{k: v for k, v in item.items() if k in TaskDefinition.__dataclass_fields__})
                     if category is None or task.category == category:
                         tasks.append(task)
@@ -112,16 +115,15 @@ class EvalHarness:
 
             # Run checkers.
             checker_results = []
-            all_passed = True
+            all_passed = run_record.status.value == "completed" and bool(task.checkers)
             for checker_def in task.checkers:
-                checker_result = await self._run_checker(checker_def, agent_loop)
+                checker_result = await self._run_checker(checker_def, agent_loop, run_record)
                 checker_results.append(checker_result)
                 if not checker_result.get("passed", False):
                     all_passed = False
 
-            # If no checkers, consider it passed if the agent completed.
             if not task.checkers:
-                all_passed = run_record.status.value == "completed"
+                checker_results.append({"passed": False, "error": "No objective checkers configured; model completion alone is insufficient"})
 
             return TaskResult(
                 task_id=task.task_id,
@@ -164,9 +166,13 @@ class EvalHarness:
         report.wall_time_seconds = time.monotonic() - suite_start
         return report
 
-    async def _run_checker(self, checker_def: dict[str, Any], agent_loop: Any) -> dict[str, Any]:
+    async def _run_checker(self, checker_def: dict[str, Any], agent_loop: Any, run_record=None) -> dict[str, Any]:
         """Run a single checker.  Checkers are shell commands that exit 0 on pass."""
         checker_type = checker_def.get("type", "shell")
+        if checker_type == "output_contains":
+            text = "\n".join(step.result_output for step in run_record.steps) if run_record else ""
+            expected = checker_def.get("expected", [])
+            return {"type": checker_type, "passed": bool(expected) and all(value in text for value in expected)}
         if checker_type == "shell":
             command = checker_def.get("command", "")
             description = checker_def.get("description", command[:80])
@@ -181,7 +187,7 @@ class EvalHarness:
         elif checker_type == "file_exists":
             path = checker_def.get("path", "")
             try:
-                result = await agent_loop._tools.execute("shell_exec", {"command": f"test -f {path} && echo EXISTS"})
+                result = await agent_loop._tools.execute("shell_exec", {"command": f"test -f {shlex.quote(path)} && echo EXISTS"})
                 return {"type": "file_exists", "path": path, "passed": result.success}
             except Exception as exc:
                 return {"type": "file_exists", "path": path, "passed": False, "error": str(exc)}

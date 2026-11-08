@@ -11,23 +11,35 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
+import secrets
 import subprocess
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI(title="XALGV Sandbox Tool Server", version="0.1.0")
 
 # ── Register browser automation routes ───────────────────────────────────
-try:
+if __package__:
+    from .browser_server import router as browser_router
+else:
     from browser_server import router as browser_router
-    app.include_router(browser_router)
-except ImportError:
-    pass
+app.include_router(browser_router)
 
 WORKSPACE = Path("/workspace")
+
+
+def protected_profile(path: Path) -> bool:
+    return any(part.casefold() == ".xbrowser" for part in (*path.parts, *path.resolve().parts))
+
+
+def workspace_path(path: Path) -> Path:
+    resolved = path.resolve()
+    if not resolved.is_relative_to(WORKSPACE.resolve()) or protected_profile(path):
+        raise PermissionError("File access must stay inside the workspace and outside browser profiles")
+    return resolved
 
 
 # ── Request / Response models ────────────────────────────────────────────
@@ -71,8 +83,11 @@ async def health() -> dict[str, str]:
 # ── Shell execution ─────────────────────────────────────────────────────
 
 @app.post("/tools/shell", response_model=ToolResponse)
-async def shell_exec(req: ShellRequest) -> ToolResponse:
+async def shell_exec(req: ShellRequest, x_sandbox_admin: str = Header(default="")) -> ToolResponse:
     """Execute a shell command and return stdout/stderr."""
+    expected = os.environ.get("SANDBOX_ADMIN_TOKEN", "")
+    if not expected or not secrets.compare_digest(expected, x_sandbox_admin):
+        raise HTTPException(status_code=403, detail="Arbitrary execution requires trusted sandbox administration")
     try:
         result = await asyncio.wait_for(
             asyncio.create_subprocess_shell(
@@ -114,6 +129,7 @@ async def read_file(req: ReadFileRequest) -> ToolResponse:
     if not path.is_absolute():
         path = WORKSPACE / path
     try:
+        path = workspace_path(path)
         text = path.read_text(encoding="utf-8", errors="replace")
         lines = text.splitlines()
         if len(lines) > req.max_lines:
@@ -133,6 +149,7 @@ async def write_file(req: WriteFileRequest) -> ToolResponse:
     if not path.is_absolute():
         path = WORKSPACE / path
     try:
+        path = workspace_path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         if req.append:
             with path.open("a", encoding="utf-8") as fh:
@@ -155,10 +172,13 @@ async def list_files(req: ListFilesRequest) -> ToolResponse:
     if not path.is_absolute():
         path = WORKSPACE / path
     try:
+        path = workspace_path(path)
         if not path.is_dir():
             return ToolResponse(success=False, output="", error=f"Not a directory: {req.path}")
         entries: list[str] = []
         for entry in sorted(path.iterdir()):
+            if protected_profile(entry):
+                continue
             kind = "dir" if entry.is_dir() else "file"
             size = entry.stat().st_size if entry.is_file() else 0
             entries.append(f"{kind}\t{size}\t{entry.name}")

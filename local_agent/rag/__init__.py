@@ -73,7 +73,8 @@ class DocumentParser:
 
     def parse(self, path: Path | str) -> list[DocumentChunk]:
         """Parse a document and return chunks."""
-        path = Path(path)
+        from local_agent.security.paths import document_path
+        path = document_path(path)
         if not path.exists():
             raise FileNotFoundError(f"Document not found: {path}")
 
@@ -410,7 +411,8 @@ class RAGPipeline:
 
     async def ingest(self, path: str | Path) -> int:
         """Parse a document, embed it, and store it.  Returns chunk count."""
-        path = Path(path)
+        from local_agent.security.paths import document_path
+        path = document_path(path)
         chunks = self._parser.parse(path)
         if not chunks:
             logger.warning("No chunks extracted from %s", path)

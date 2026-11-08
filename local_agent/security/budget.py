@@ -39,7 +39,7 @@ class BudgetTracker:
         self.start_time = time.monotonic()
         self._action_counts.clear()
 
-    def record_step(self, action_key: str) -> None:
+    def record_step(self, action_key: str, *, cost: int = 1) -> None:
         """Record that one step was taken.
 
         Parameters
@@ -48,8 +48,19 @@ class BudgetTracker:
             A string that uniquely identifies the action (e.g.
             ``"shell_exec:ls -la"``).  Used to detect loops.
         """
-        self.steps += 1
+        if cost < 0:
+            raise ValueError("Action cost must not be negative")
+        self.steps += cost
         self._action_counts[action_key] += 1
+
+    def check_capacity(self, cost: int) -> None:
+        self.check()
+        if cost < 1 or cost > self.remaining_steps:
+            raise BudgetExhaustedError(f"Action allowance exceeded: requested {cost}, remaining {self.remaining_steps}.")
+
+    @property
+    def remaining_seconds(self) -> float:
+        return max(0.0, self.max_wall_time_seconds - self.elapsed_seconds)
 
     # ── Checks ───────────────────────────────────────────────────────────
 
