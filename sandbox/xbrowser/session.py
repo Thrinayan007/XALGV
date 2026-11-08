@@ -7,6 +7,7 @@ No mutating browser action is automatically replayed after a failure.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import uuid
 from collections import deque
@@ -48,6 +49,34 @@ class BrowserSession:
         self._context = None
         self._dead = False
         self._restarted = False
+        self._profile_lock = None
+
+    def _claim_profile(self):
+        if os.name != "posix":
+            return
+        import fcntl
+        owner = (self.profile.parent / "controller.lock").open("a")
+        try:
+            fcntl.flock(owner, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            owner.close()
+            raise BrowserError("PROFILE_IN_USE", "Another controller owns this browser scope") from exc
+        self._profile_lock = owner
+        wanted = os.fsencode(f"--user-data-dir={self.profile}")
+        for process in Path("/proc").iterdir():
+            if not process.name.isdigit():
+                continue
+            try:
+                if wanted in (process / "cmdline").read_bytes().split(b"\0"):
+                    raise BrowserError("PROFILE_IN_USE", "A running Chromium process owns this profile")
+            except (OSError, PermissionError):
+                continue
+        # Only Chromium's ephemeral singleton symlinks are recovered. Cookies,
+        # history and all other persistent profile data remain intact.
+        for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+            link = self.profile / name
+            if link.is_symlink():
+                link.unlink()
 
     @property
     def running(self):
@@ -63,8 +92,9 @@ class BrowserSession:
         if not self.profile.resolve().is_relative_to(self.workspace):
             raise BrowserError("INVALID_PROFILE", "Browser profile must remain inside the workspace")
         self.profile.mkdir(parents=True, exist_ok=True, mode=0o700)
-        self._playwright = await async_playwright().start()
         try:
+            self._claim_profile()
+            self._playwright = await async_playwright().start()
             self._proxy = EgressProxy(self.policy, self.events)
             proxy_url = await self._proxy.start()
             self._context = await self._playwright.chromium.launch_persistent_context(
@@ -154,9 +184,14 @@ class BrowserSession:
             finally:
                 self.tabs.clear()
                 self._dead = False
-                if self._proxy:
-                    await self._proxy.stop()
-                    self._proxy = None
+                try:
+                    if self._proxy:
+                        await self._proxy.stop()
+                        self._proxy = None
+                finally:
+                    if self._profile_lock:
+                        self._profile_lock.close()
+                        self._profile_lock = None
 
     @asynccontextmanager
     async def operation(self):

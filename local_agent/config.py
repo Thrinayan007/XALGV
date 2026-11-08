@@ -28,14 +28,14 @@ class ModelRoleConfig:
 # }
 DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
     "planner": ModelRoleConfig(
-        model="qwen3.5:9b",
+        model="gemma4:e4b",
         context_length=8192,
         temperature=0.0,
         thinking=False
     ),
 
     "executor": ModelRoleConfig(
-        model="qwen3.5:9b",
+        model="gemma4:e4b",
         # context_length=4096,
         # temperature=0.3
         context_length=8192,
@@ -44,25 +44,25 @@ DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
     ),
 
     "router": ModelRoleConfig(
-        model="qwen3:1.7b",
+        model="gemma4:e4b",
         context_length=4096,
         temperature=0.1
     ),
 
     "vision": ModelRoleConfig(
-        model="qwen3.5:9b",
+        model="gemma4:e4b",
         context_length=8192,
         temperature=0.0
     ),
 
     "embed": ModelRoleConfig(
-        model="bge-m3",
+        model="gemma4:e4b",
         context_length=8192,
         temperature=0.0
     ),
 
     "translate": ModelRoleConfig(
-        model="qwen3:8b",
+        model="gemma4:e4b",
         context_length=8192,
         temperature=0.3
     ),

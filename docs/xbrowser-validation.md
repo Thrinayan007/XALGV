@@ -5,6 +5,15 @@ gates are complete. Browser sessions, references, nine actions, macros, trusted 
 checks, sandbox network/approval controls, real-token budgets, marked screenshots,
 and optional local vision analysis are implemented.
 
+Follow-up from a real container restart: stale X display files and Chromium
+singleton links exposed a restart case missed by the initial smoke tests. Startup
+now removes stale display files, waits for readiness, supervises all services,
+checks the live VNC backend, and closes Chromium before stopping the display.
+Profile recovery holds an exclusive scope lock and refuses to disturb live
+Chromium owners. Planner/executor tool lists are now permission-filtered, and an
+unadvertised shell choice is returned for model correction rather than executed.
+Focused regressions and a managed capture of the reported site passed.
+
 | Gate | Recorded result |
 | --- | --- |
 | Full regression suite | 230 passed in 116.10 seconds |

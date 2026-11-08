@@ -18,22 +18,8 @@ logger = logging.getLogger(__name__)
 
 PLAN_SYSTEM_PROMPT = """\
 You are a planning module for an autonomous computer-using agent.
-You operate inside a sandboxed Linux environment with these tools:
-
-File & Shell:
-  shell_exec, read_file, write_file, list_files, python_exec
-
-Web & Search:
-  web_search — search the public web via SearXNG
-
-Browser (Playwright inside sandbox):
-  browser_open, browser_observe, browser_click, browser_type, browser_press,
-  browser_scroll, browser_tabs, browser_wait, browser_screenshot
-  browser_run — up to 20 deterministic actions in one bounded macro
-
-Document Intelligence (RAG):
-  ingest_document — parse and embed a document (PDF, DOCX, HTML, TXT)
-  query_documents — semantic search over ingested documents with citations
+You operate inside a sandboxed Linux environment. Use ONLY the available tools
+listed for this run. Unlisted tools and external programs are not available.
 
 Design principle: "Structure first, pixels second."  Prefer the
 browser_observe refs over guessed selectors. Capture screenshots when the goal
@@ -45,6 +31,11 @@ Never omit screenshots or other deliverables explicitly requested by the user.
 When a URL and screenshot paths are already supplied, use ONE objective: run a
 single browser_run containing open, screenshot, then alternating scroll/screenshot.
 Do not add observation or separate navigation objectives to that known sequence.
+Browser screenshots MUST use browser_screenshot or browser_run. Never start a
+second Playwright browser through shell/Python. "Viewport" means full_page=false;
+do not scroll first unless the user requested another position. To describe what
+is visible, use browser_screenshot with describe=true or browser_observe with text=true.
+Do not plan Python/OCR or installation for normal page descriptions.
 
 Respond with ONLY a JSON object:
 {
@@ -69,9 +60,15 @@ Respond with ONLY a JSON object:
 class Planner:
     """Generates and revises plans via the model manager."""
 
-    def __init__(self, model_manager: ModelManager, max_plan_steps: int = 16) -> None:
+    def __init__(self, model_manager: ModelManager, max_plan_steps: int = 16, *, tool_names=None) -> None:
         self._model = model_manager
         self._max_steps = max_plan_steps
+        self._tool_names = tool_names
+
+    def _with_tools(self, prompt):
+        if self._tool_names is not None:
+            prompt += "\nAvailable tools for this run: " + ", ".join(self._tool_names)
+        return prompt
 
     async def create_plan(self, goal: str) -> tuple[list[str], str]:
         """Generate an initial plan for *goal*.
@@ -79,7 +76,7 @@ class Planner:
         Returns ``(plan_steps, reasoning)``.
         """
         messages = [
-            {"role": "system", "content": PLAN_SYSTEM_PROMPT},
+            {"role": "system", "content": self._with_tools(PLAN_SYSTEM_PROMPT)},
             {"role": "user", "content": f"Goal: {goal}"},
         ]
         response = await self._model.chat("planner", messages, max_tokens=1024)
@@ -92,7 +89,7 @@ class Planner:
         """
         context = state.summary_for_model()
         messages = [
-            {"role": "system", "content": REPLAN_SYSTEM_PROMPT},
+            {"role": "system", "content": self._with_tools(REPLAN_SYSTEM_PROMPT)},
             {"role": "user", "content": (
                 f"Goal: {state.goal}\n\n"
                 f"Current state:\n{context}\n\n"

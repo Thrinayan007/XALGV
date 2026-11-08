@@ -207,3 +207,31 @@ async def test_arbitrary_execution_requires_system_permission():
         assert registry.get(name).permission_tier == PermissionTier.SYSTEM
         with pytest.raises(PermissionDeniedError):
             await registry.execute(name, {})
+
+
+async def test_unavailable_shell_choice_is_repaired_without_approval_or_execution(tmp_path):
+    from local_agent.tools.shell import ShellExecTool
+    sandbox = Sandbox()
+    model = Model([response(tool="shell_exec", args={"command": "echo forbidden"}),
+                   response(tool="browser_scroll"), response("DONE: complete")])
+    loop = make_loop(tmp_path, model, sandbox)
+    loop._tools.register(ShellExecTool())
+    run = await loop.run("Take a browser screenshot")
+    assert run.status == RunStatus.COMPLETED
+    assert "unavailable" in run.steps[1].error
+    assert len(sandbox.calls) == 1
+    assert "shell_exec" not in model.prompts[0][0]["content"]
+
+
+async def test_planner_advertises_only_available_tools():
+    from local_agent.core.planner import Planner
+
+    class RecordingModel:
+        async def chat(self, role, messages, **kwargs):
+            prompt = messages[0]["content"]
+            assert "Available tools for this run: browser_open, browser_screenshot" in prompt
+            assert "shell_exec" not in prompt and "python_exec" not in prompt
+            assert "describe=true" in prompt
+            return response(json.dumps({"plan": ["Capture and describe"], "reasoning": "native browser tools"}))
+
+    await Planner(RecordingModel(), tool_names=["browser_open", "browser_screenshot"]).create_plan("Capture and describe")
