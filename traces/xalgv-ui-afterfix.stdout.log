@@ -1,0 +1,16 @@
+XALGV UI: http://127.0.0.1:7860
+INFO:     127.0.0.1:21136 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11068 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:11068 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:28373 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35977 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:28373 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31535 - "POST /api/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31535 - "GET /api/artifact?path=%2Fworkspace%2Fwiki-scroll%2Fsearch-results.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32410 - "POST /api/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45711 - "POST /api/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45711 - "GET /api/artifact?path=%2Fworkspace%2Fyt%2Fsearch-results.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55885 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55885 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58624 - "POST /api/run HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58624 - "GET /api/artifact?path=%2Fworkspace%2Fyt%2Fsearch-results-new.png HTTP/1.1" 200 OK

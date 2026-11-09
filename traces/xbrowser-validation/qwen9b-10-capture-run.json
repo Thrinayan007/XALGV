@@ -1,0 +1,590 @@
+{
+  "model": "qwen3.5:9b-q4_K_M",
+  "repeats": 2,
+  "mode": "real-model-real-chromium-local-fixtures",
+  "context_length": 8192,
+  "results": [
+    {
+      "trial": "reference_form-0-a04b3a77",
+      "scenario": "reference_form",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully opened http://127.0.0.1:38761/profile.html, typed \"Ada Lovelace\" into the Display name field, clicked Save profile, and verified that \"Saved Ada Lovelace\" appears on the page.",
+      "seconds": 54.34299999999348,
+      "model_calls": 7,
+      "prompt_tokens": 16265,
+      "generated_tokens": 750,
+      "tools": [
+        "browser_open",
+        "browser_observe",
+        "browser_type",
+        "browser_click",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 26.405999999959022,
+          "prompt_tokens": 417,
+          "generated_tokens": 182,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 3.0,
+          "prompt_tokens": 2152,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 3.3910000000032596,
+          "prompt_tokens": 2260,
+          "generated_tokens": 85,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 5.5310000000172295,
+          "prompt_tokens": 2601,
+          "generated_tokens": 149,
+          "tools": [
+            "browser_type"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 3.6869999999762513,
+          "prompt_tokens": 2799,
+          "generated_tokens": 87,
+          "tools": [
+            "browser_click"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 3.2959999999729916,
+          "prompt_tokens": 2959,
+          "generated_tokens": 74,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 5.313000000023749,
+          "prompt_tokens": 3077,
+          "generated_tokens": 129,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "c1ee2e5eac114f5c8937675de5eaa52e",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:38761/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Saved Ada Lovelace"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      },
+      "workflow_correct": true,
+      "three_call_target_met": true
+    },
+    {
+      "trial": "five_captures-0-3e2eab27",
+      "scenario": "five_captures",
+      "passed": false,
+      "run_status": "failed",
+      "summary": "Repeated-action limit reached: 'browser_run:6124c2a0f3e6bcaa10c3306105ef2766ae68d25ce1894e335e092cc07d762bb5' attempted 3 times.",
+      "seconds": 37.0,
+      "model_calls": 7,
+      "prompt_tokens": 16194,
+      "generated_tokens": 936,
+      "tools": [
+        "browser_run",
+        "browser_run",
+        "browser_run",
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 8.094000000040978,
+          "prompt_tokens": 572,
+          "generated_tokens": 230,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 5.094000000040978,
+          "prompt_tokens": 2637,
+          "generated_tokens": 129,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 4.561999999976251,
+          "prompt_tokens": 2865,
+          "generated_tokens": 110,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 4.6560000000172295,
+          "prompt_tokens": 3081,
+          "generated_tokens": 110,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "planner",
+          "seconds": 5.25,
+          "prompt_tokens": 689,
+          "generated_tokens": 137,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 4.813000000023749,
+          "prompt_tokens": 3093,
+          "generated_tokens": 110,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 3.827999999979511,
+          "prompt_tokens": 3257,
+          "generated_tokens": 110,
+          "tools": [
+            "browser_run"
+          ]
+        }
+      ],
+      "acceptance": {
+        "error_code": "TASK_INCOMPLETE",
+        "action": "verify",
+        "session_id": "283029cb2f3e43c9981111d3a1c9bbc2",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:38761/profile.html"
+              },
+              "passed": false,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-3e2eab27/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": false,
+              "error": "Required artifact does not exist"
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-3e2eab27/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": false,
+              "error": "Required artifact does not exist"
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-3e2eab27/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": false,
+              "error": "Required artifact does not exist"
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-3e2eab27/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": false,
+              "error": "Required artifact does not exist"
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-0-3e2eab27/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": false,
+              "error": "Required artifact does not exist"
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "failed"
+      },
+      "workflow_correct": false,
+      "three_call_target_met": false
+    },
+    {
+      "trial": "reference_form-1-c9d525c6",
+      "scenario": "reference_form",
+      "passed": true,
+      "run_status": "completed",
+      "summary": "Successfully opened http://127.0.0.1:38761/profile.html, typed 'Ada Lovelace' into the Display name field, clicked Save profile, and verified that 'Saved Ada Lovelace' appears on the page.",
+      "seconds": 32.39100000000326,
+      "model_calls": 7,
+      "prompt_tokens": 16294,
+      "generated_tokens": 766,
+      "tools": [
+        "browser_open",
+        "browser_observe",
+        "browser_type",
+        "browser_click",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 6.547000000020489,
+          "prompt_tokens": 417,
+          "generated_tokens": 182,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 1.9380000000237487,
+          "prompt_tokens": 2152,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 3.3130000000237487,
+          "prompt_tokens": 2260,
+          "generated_tokens": 85,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 6.157000000006519,
+          "prompt_tokens": 2595,
+          "generated_tokens": 155,
+          "tools": [
+            "browser_type"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 4.39100000000326,
+          "prompt_tokens": 2800,
+          "generated_tokens": 100,
+          "tools": [
+            "browser_click"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 3.547000000020489,
+          "prompt_tokens": 2973,
+          "generated_tokens": 74,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 5.51600000000326,
+          "prompt_tokens": 3097,
+          "generated_tokens": 126,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "d31ad1f5e8be47ea8b1d9b3f58ecaf8c",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:38761/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Saved Ada Lovelace"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      },
+      "workflow_correct": true,
+      "three_call_target_met": true
+    },
+    {
+      "trial": "five_captures-1-009755dc",
+      "scenario": "five_captures",
+      "passed": false,
+      "run_status": "completed",
+      "summary": "Successfully executed browser_run to open http://127.0.0.1:38761/profile.html, took first viewport screenshot (page-0.png), then alternated scroll down 500 pixels and viewport screenshot four times, creating all five required PNG files at the specified paths.",
+      "seconds": 29.71799999999348,
+      "model_calls": 4,
+      "prompt_tokens": 9483,
+      "generated_tokens": 775,
+      "tools": [
+        "browser_run",
+        "browser_run"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 7.48499999998603,
+          "prompt_tokens": 572,
+          "generated_tokens": 209,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 6.077999999979511,
+          "prompt_tokens": 2631,
+          "generated_tokens": 163,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 8.421999999962281,
+          "prompt_tokens": 2915,
+          "generated_tokens": 237,
+          "tools": [
+            "browser_run"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 6.422000000020489,
+          "prompt_tokens": 3365,
+          "generated_tokens": 166,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "31d9f3469d46419b90a597a28a548a69",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:38761/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-009755dc/page-0.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-009755dc/page-1.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-009755dc/page-2.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-009755dc/page-3.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "artifact",
+                "path": "five_captures-1-009755dc/page-4.png",
+                "min_bytes": 1,
+                "contains": null,
+                "sha256": null,
+                "png": true,
+                "width": 1280,
+                "height": 720
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      },
+      "workflow_correct": false,
+      "three_call_target_met": false
+    }
+  ],
+  "status": "complete",
+  "success_rate": 0.5,
+  "target_success_rate": 0.9,
+  "target_met": false,
+  "capture_three_call_target_met": false,
+  "median_seconds": 34.69550000000163,
+  "p95_seconds": 54.34299999999348,
+  "median_model_calls": 7.0,
+  "running_models": [
+    {
+      "name": "qwen3.5:9b-q4_K_M",
+      "model": "qwen3.5:9b-q4_K_M",
+      "size": 6385408405,
+      "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen35",
+        "families": [
+          "qwen35"
+        ],
+        "parameter_size": "9.0B",
+        "quantization_level": "Q4_K_M"
+      },
+      "expires_at": "2026-11-09T09:37:41.2158821+05:30",
+      "size_vram": 5458834225,
+      "context_length": 8192
+    }
+  ]
+}

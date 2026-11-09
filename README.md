@@ -35,7 +35,7 @@ Host Machine:                          Docker Sandbox:
 
 - Python 3.11+
 - Docker & Docker Compose
-- [Ollama](https://ollama.ai) with `qwen3:8b` (or configure another model)
+- [Ollama](https://ollama.ai) with `qwen3.5:9b-q4_K_M` (or another model selected with `--model`)
 
 ### 2. Install
 
@@ -50,7 +50,7 @@ pip install -e ".[dev]"
 docker compose up -d
 
 # Pull the default model
-ollama pull qwen3:8b
+ollama pull qwen3.5:9b-q4_K_M
 ```
 
 ### 4. Check Health
@@ -62,8 +62,26 @@ python -m local_agent.main health
 ### 5. Run the Agent
 
 ```bash
-python -m local_agent.main run "Create a Python hello-world project with tests"
+python -m local_agent.main run --model qwen3.5:9b-q4_K_M "Create a Python hello-world project with tests"
 ```
+
+Pass any installed Ollama model tag with `--model`. This overrides the agent's
+planner, executor, router, vision, and translation roles for that run; the
+configured embedding model is left unchanged.
+
+### Local prompt and screenshot UI
+
+Start the browser sandbox and Ollama, then run:
+
+```powershell
+.\venv\Scripts\python.exe -m local_agent.main ui
+```
+
+Open [http://127.0.0.1:7860](http://127.0.0.1:7860). Choose an installed Ollama
+model, enter a task, and optionally attach a PNG or JPEG screenshot (up to 8 MiB)
+to ask a question about its visible text or content. The model can also call the
+`image_question` tool on images saved under `workspace/uploads/`. Runs and their
+tool results appear on the page. The UI binds to localhost by default.
 
 ### 6. Run Evaluation
 
