@@ -67,28 +67,47 @@ class TargetRequest(Request):
         return self
 
 
-class ClickRequest(TargetRequest):
+class SemanticTarget(Request):
+    role: str = Field(pattern=r"^[a-z]{1,32}$")
+    name: str = Field(min_length=1, max_length=80)
+    frame_id: str | None = Field(default=None, pattern=r"^f(?:[1-9]|1[0-6])$")
+    nearby_label: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class HybridTargetRequest(TargetRequest):
+    semantic_target: SemanticTarget | None = None
+
+    @model_validator(mode="after")
+    def semantic_strategy(self):
+        if self.semantic_target and self.selector is not None:
+            raise ValueError("Choose semantic_target or selector")
+        if self.semantic_target and self.semantic_target.frame_id not in (None, "f1") and self.ref is None:
+            raise ValueError("Nested frame targeting requires ref + snapshot_id")
+        return self
+
+
+class ClickRequest(HybridTargetRequest):
     text: str | None = None
     role: str | None = None
 
     @model_validator(mode="after")
     def click_target(self):
-        if self.ref is not None and (self.text is not None or self.role is not None):
-            raise ValueError("Reference targeting cannot be mixed with text or role")
-        if not (self.selector or self.text or self.ref):
-            raise ValueError("Provide ref + snapshot_id, selector, or text")
+        if (self.ref is not None or self.semantic_target) and (self.text is not None or self.role is not None):
+            raise ValueError("Ref and semantic_target cannot be mixed with top-level text or role")
+        if not (self.selector or self.text or self.ref or self.semantic_target):
+            raise ValueError("Provide ref + snapshot_id, semantic_target, selector, or text")
         return self
 
 
-class TypeRequest(TargetRequest):
+class TypeRequest(HybridTargetRequest):
     text: str
     clear_first: bool = True
     press_enter: bool = False
 
     @model_validator(mode="after")
     def type_target(self):
-        if not (self.selector or self.ref):
-            raise ValueError("Provide ref + snapshot_id or selector")
+        if not (self.selector or self.ref or self.semantic_target):
+            raise ValueError("Provide ref + snapshot_id, semantic_target, or selector")
         return self
 
 
@@ -166,9 +185,16 @@ BrowserStep = Annotated[
 ]
 
 
+class NetworkWrite(Request):
+    method: Literal["POST"]
+    url: str = Field(min_length=1, max_length=8192)
+    body_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class ApprovalRequest(Request):
     tool: Literal["click", "type", "press"]
     args: dict[str, Any]
+    network_write: NetworkWrite | None = None
 
 
 class ImageRequest(Request):
@@ -187,7 +213,7 @@ class ArtifactCheck(Request):
 
 
 class PageCheck(Request):
-    kind: Literal["url", "text", "tab_count"]
+    kind: Literal["url", "url_host", "url_contains", "text", "tab_count"]
     expected: str = Field(min_length=1, max_length=10000)
 
 

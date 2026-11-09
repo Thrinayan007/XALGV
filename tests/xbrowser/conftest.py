@@ -18,6 +18,18 @@ def site():
         def log_message(self, *_):
             pass
 
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            if self.path == "/reviewed-redirect":
+                self.send_response(307)
+                self.send_header("Location", "/reviewed-write")
+                self.end_headers()
+                return
+            self.send_response(200 if self.path == "/reviewed-write" and body == b"value=reviewed" else 400)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"Reviewed form reached the server")
+
         def do_GET(self):
             if self.path.startswith("/redirect?"):
                 self.send_response(302)

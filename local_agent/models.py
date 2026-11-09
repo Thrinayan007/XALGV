@@ -9,13 +9,13 @@ the VRAM budget.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
+from local_agent.agents.inference_scheduler import InferenceScheduler, budgeted
 from local_agent.config import AgentConfig, ModelRoleConfig
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,7 @@ class ModelManager:
         self._current_model: str | None = None
         self._lock = asyncio.Lock()
         self._no_think: set[str] = set()  # models that reject the `think` option
+        self.inference = InferenceScheduler(config.data_dir / "resource-locks", config.ollama_base_url)
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -95,6 +96,17 @@ class ModelManager:
         max_tokens: int | None = None,
     ) -> ChatResponse:
         """Send a chat completion request using the model for *role*."""
+        context = self._role_config(role).context_length
+        if budgeted():
+            if max_tokens is not None and max_tokens < 1:
+                raise ValueError("Budgeted inference requires a positive generation limit")
+            max_tokens = min(max_tokens if max_tokens is not None else 2048, context)
+        return await self.inference.submit(
+            lambda: self._chat(role, messages, tools=tools, temperature=temperature, max_tokens=max_tokens),
+            context_tokens=context, output_tokens=max_tokens or 0, label=role,
+        )
+
+    async def _chat(self, role, messages, *, tools, temperature, max_tokens) -> ChatResponse:
         role_cfg = self._role_config(role)
         await self._ensure_model_loaded(role_cfg.model)
 
@@ -171,6 +183,9 @@ class ModelManager:
 
     async def embed(self, texts: list[str], *, role: str = "embed") -> EmbedResponse:
         """Compute embeddings for a list of texts."""
+        return await self.inference.submit(lambda: self._embed(texts, role), label=role)
+
+    async def _embed(self, texts, role) -> EmbedResponse:
         role_cfg = self._role_config(role)
         await self._ensure_model_loaded(role_cfg.model)
 
@@ -201,6 +216,7 @@ class ModelManager:
             return False
 
     async def close(self) -> None:
+        await self.inference.drain()
         await self._client.aclose()
 
     # ── Internal ─────────────────────────────────────────────────────────

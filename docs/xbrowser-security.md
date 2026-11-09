@@ -25,9 +25,10 @@ Trusted server configuration:
 | --- | --- |
 | `XBROWSER_ALLOWED_DOMAINS` | Comma-separated exact domains or explicit `*.domain` patterns; empty permits public domains |
 | `XBROWSER_DENIED_DOMAINS` | Denials take precedence |
-| `XBROWSER_LOCAL_ORIGINS` | Exact HTTP(S) origins for specifically trusted local services; default empty |
+| `XBROWSER_LOCAL_ORIGINS` | Exact HTTP(S) origins using localhost or literal IPs; default empty |
 | `XBROWSER_ALLOWED_ACTIONS` | Optional core action capability list; an empty configured value denies all |
 | `XBROWSER_ADMIN_TOKEN` | Enables authenticated, trusted approval issuance; unset disables it |
+| `XBROWSER_REVIEW_INTERACTIONS` | Set to `1` to require review for click, type, and editing keys in sensitive deployments |
 
 Local exceptions deliberately grant access to that origin and must be narrowly
 configured. They cannot be supplied in browser tool arguments. The deployment
@@ -36,9 +37,14 @@ Production configuration is restored afterward.
 
 ## Sensitive interactions
 
-Credential/payment controls and sensitive form interactions require a reviewed
-approval. Non-GET/HEAD/OPTIONS browser requests are blocked unless an approved
-action is currently executing. File uploads and downloads remain disabled.
+Credential/payment controls and native form submissions require a reviewed
+approval. UI approval alone grants no network writes. A trusted caller can
+add `network_write={"method":"POST","url":"…","body_sha256":"…"}` to authorize
+one exact URL-encoded POST from the active tab's top-level navigation. Background
+requests and redirects cannot spend that grant. The sandbox sends the approved
+request through the same pinned proxy, without following redirects or retrying.
+Redirects and unconfirmed responses require outcome verification. File uploads
+and downloads remain disabled.
 Browser chrome, developer-tool, file-dialog, and system keyboard shortcuts are
 blocked; document navigation/editing keys remain available. Password and common
 payment values are omitted from structured observations.
@@ -46,7 +52,7 @@ payment values are omitted from structured observations.
 Host applications can call `SandboxClient.browser_authorize(tool, args, admin_token)`
 only after the person has reviewed that exact action. The `/authorize` endpoint
 requires `X-XBrowser-Admin`. Its single-use token expires after 120 seconds and is
-bound to the normalized arguments, session, generation, tab, and page fingerprint.
+bound to the normalized arguments, session, generation, tab, page fingerprint, and focus.
 Use `client.use_browser_approval(token)` for the next click/type/press request.
 An altered, replayed, expired, or stale grant fails closed. Model tool schemas
 contain no approval-issuance method or administrative secret. Macros cannot carry
@@ -56,7 +62,9 @@ Sensitive-control recognition is conservative and heuristic; HTTP method control
 provide an independent network boundary. Some poorly designed websites mutate
 state through GET requests. Domain policy, target review, and acceptance criteria
 are still needed; this implementation does not claim to infer every transaction's
-business meaning. Native file choosers are intercepted without supplying files.
+business meaning. Browser proxy and protocol controls are enforced within
+Chromium and the sandbox server. Deployments that need to contain a compromised
+browser process also need OS-level egress isolation.
 
 ## Profiles, files, and media
 
@@ -98,7 +106,7 @@ record = await loop.run(goal, acceptance_checks=[
 
 Alternatively, save the checks as a JSON list (or `{"checks": [...]}`) and run
 `xalgv run "your goal" --acceptance checks.json`. Supported checks cover exact
-active URL, visible text, tab count, file existence/minimum size, UTF-8 contents,
+active URL or hostname, visible text, tab count, file existence/minimum size, UTF-8 contents,
 SHA-256, PNG decoding, and PNG dimensions. All checks must pass.
 
 The loop copies the trusted criteria before execution. A model's `DONE:` triggers

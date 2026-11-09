@@ -11,10 +11,11 @@ import os
 import re
 import uuid
 from collections import deque
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import httpx
 from playwright.async_api import Error as PlaywrightError
 
 from .approvals import ApprovalStore
@@ -39,7 +40,7 @@ class BrowserSession:
         self.references = ReferenceRegistry()
         self.policy = BrowserPolicy()
         self.approvals = ApprovalStore()
-        self._approved = False
+        self._approval = None
         self._proxy = None
         self._navigation_error = None
         self.max_tabs = 12
@@ -103,7 +104,9 @@ class BrowserSession:
                 accept_downloads=False,
                 service_workers="block",
                 proxy={"server": proxy_url, "bypass": "<-loopback>"},
-                args=["--disable-dev-shm-usage", "--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"],
+                args=["--disable-dev-shm-usage", "--disable-quic", "--disable-background-networking",
+                      "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
+                      "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"],
             )
             await self._context.route("**/*", self._guard_request)
             await self._context.add_init_script("""for (const name of ['RTCPeerConnection','webkitRTCPeerConnection']) {
@@ -125,16 +128,63 @@ class BrowserSession:
 
     async def _guard_request(self, route):
         request = route.request
+        approved_write = None
         try:
             await self.policy.resolve(request.url)
-            if request.method not in {"GET", "HEAD", "OPTIONS"} and not self._approved:
-                raise BrowserError("HUMAN_APPROVAL_REQUIRED", "Network writes require a reviewed action approval")
-            await route.continue_()
+            if request.method in {"GET", "HEAD", "OPTIONS"}:
+                await route.continue_()
+                return
+            approval = self._approval
+            if approval is None or not approval.take_write(request):
+                raise BrowserError("HUMAN_APPROVAL_REQUIRED", "Network write does not match a reviewed submission")
+            approved_write = approval
+            await self._send_reviewed_write(route)
         except BrowserError as exc:
+            if approved_write:
+                approved_write.write_error = exc
             self.events.append({"type": "request_denied", "code": exc.code})
-            if request.is_navigation_request():
-                self._navigation_error = exc
-            await route.abort("blockedbyclient")
+            with suppress(PlaywrightError):
+                if request.is_navigation_request() and self.tabs.active and request.frame is self.tabs.page().main_frame:
+                    self._navigation_error = exc
+                    pending = self._approval
+                    if pending and pending.armed and pending.network_write is not None:
+                        pending.write_error = exc
+                        pending.write_finished.set()
+            with suppress(PlaywrightError):
+                await route.abort("blockedbyclient")
+        finally:
+            if approved_write:
+                approved_write.write_finished.set()
+
+    async def _send_reviewed_write(self, route):
+        request = route.request
+        hop_headers = {"connection", "proxy-authorization", "proxy-connection", "host", "content-length",
+                       "transfer-encoding", "upgrade", "trailer", "te", "keep-alive"}
+        try:
+            async with asyncio.timeout(5), httpx.AsyncClient(
+                proxy=self._proxy.url, trust_env=False, follow_redirects=False,
+            ) as client:
+                headers = {key: value for key, value in (await request.all_headers()).items() if key not in hop_headers}
+                headers["accept-encoding"] = "identity"
+                async with client.stream(request.method, request.url, headers=headers,
+                                         content=request.post_data_buffer or b"") as response:
+                    if not response.is_success:
+                        raise BrowserError("SUBMISSION_UNCERTAIN", f"Reviewed write returned HTTP {response.status_code}; verify the outcome")
+                    if response.headers.get("content-encoding", "identity").lower() != "identity":
+                        raise BrowserError("SUBMISSION_UNCERTAIN", "Reviewed write returned unsupported content encoding")
+                    body = bytearray()
+                    async for chunk in response.aiter_raw(chunk_size=65536):
+                        body.extend(chunk)
+                        if len(body) > 8 * 1024 * 1024:
+                            raise BrowserError("SUBMISSION_UNCERTAIN", "Reviewed write response exceeded the size limit")
+                    headers = {key: value for key, value in response.headers.items()
+                               if key not in hop_headers and key not in {"content-encoding", "refresh", "set-cookie"}}
+                    cookies = response.headers.get_list("set-cookie")
+                    if cookies:
+                        headers["set-cookie"] = "\n".join(cookies)
+                    await route.fulfill(status=response.status_code, headers=headers, body=bytes(body))
+        except (httpx.HTTPError, PlaywrightError, TimeoutError) as exc:
+            raise BrowserError("SUBMISSION_UNCERTAIN", "Reviewed write may have reached the server; verify the outcome") from exc
 
     def _on_closed(self, *_):
         self._dead = True
@@ -199,14 +249,14 @@ class BrowserSession:
         async with self._lock:
             self._restarted = False
             self._navigation_error = None
-            self._approved = False
+            self._approval = None
             await self._start()
             if self.tabs.active is None:
                 await self._context.new_page()
             try:
                 yield self.tabs.page()
             finally:
-                self._approved = False
+                self._approval = None
 
     @staticmethod
     def validate_url(url: str):
@@ -300,6 +350,7 @@ class BrowserSession:
             return await self._open(page, url, new_tab=new_tab, wait_for=wait_for)
 
     async def _open(self, page, url: str, *, new_tab=False, wait_for="load"):
+        before_url = page.url
         self.validate_url(url)
         if url != "about:blank":
             await self.policy.resolve(url)
@@ -319,6 +370,7 @@ class BrowserSession:
             "requested_url": url, "final_url": page.url,
             "status": response.status if response else None,
             "host_matches": urlsplit(url).hostname == urlsplit(page.url).hostname,
+            "url_changed": page.url != before_url,
         })
         if response and response.status >= 400:
             result.success = False

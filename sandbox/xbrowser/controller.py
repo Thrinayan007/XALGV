@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+from contextlib import suppress
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
@@ -20,9 +21,9 @@ def failure(session, action, exc, *, code=None):
         code = exc.code if isinstance(exc, BrowserError) else (
             "ACTION_TIMEOUT" if isinstance(exc, (TimeoutError, PlaywrightTimeout)) else "BROWSER_ERROR"
         )
-    uncertain = code == "ACTION_TIMEOUT"
+    uncertain = code in {"ACTION_TIMEOUT", "SUBMISSION_UNCERTAIN", "BROWSER_CRASHED"}
     return BrowserResponse(success=False, action=action, error=str(exc) or code, error_code=code,
-                           output="Action timed out; observe before retrying. Side effects may have completed." if uncertain else "",
+                           output="Action outcome is uncertain. Verify the result before attempting another mutation." if uncertain else "",
                            data={"outcome_uncertain": True} if uncertain else {},
                            session_id=session.session_id, generation=session.generation,
                            tab_id=session.tabs.active, restarted=session._restarted)
@@ -64,7 +65,45 @@ async def dispatch(session, action, request):
     else:
         method = {"click": actions.click, "type": actions.type_text, "press": actions.press,
                   "wait": actions.wait, "scroll": actions.scroll}[action]
-        result = await method(session, page, request)
+        try:
+            result = await method(session, page, request)
+            approval = session._approval
+            if approval and (approval.network_write is not None or approval.write_started):
+                if approval.write_started or not session._navigation_error:
+                    try:
+                        await asyncio.wait_for(approval.write_finished.wait(), timeout=6)
+                    except TimeoutError as exc:
+                        raise BrowserError("SUBMISSION_UNCERTAIN", "Reviewed submission was not confirmed; verify the outcome") from exc
+                if approval.write_error:
+                    raise approval.write_error
+                if approval.write_started and session._navigation_error:
+                    raise BrowserError("SUBMISSION_UNCERTAIN", "A navigation was blocked after the reviewed write began")
+                if approval.write_started:
+                    result.action_verification["reviewed_write_response"] = True
+            if session._navigation_error and action in {"click", "type", "press"}:
+                raise session._navigation_error
+        except PlaywrightError:
+            if session._approval and session._approval.write_started:
+                raise BrowserError("SUBMISSION_UNCERTAIN", "The reviewed write may have reached the server") from None
+            if session._navigation_error:
+                raise session._navigation_error from None
+            if session._dead or page.is_closed():
+                raise BrowserError("BROWSER_CRASHED", "Browser target was lost during the action") from None
+            raise
+        except BrowserError as exc:
+            if action not in {"click", "type"} or exc.code not in {
+                "AMBIGUOUS_TARGET", "SEMANTIC_TARGET_NOT_FOUND", "TARGET_MISMATCH",
+                "STALE_REF", "INVALID_REF", "TARGET_NOT_ACTIONABLE",
+            }:
+                raise
+            result = failure(session, action, exc)
+            with suppress(BrowserError, PlaywrightError, TimeoutError):
+                session.policy.check("observe")
+                async with asyncio.timeout(3):
+                    fresh = await observe(session, session.tabs.page(), ObserveRequest())
+                result.snapshot_id = fresh.snapshot_id
+                result.data["observation"] = fresh.data
+                result.output = fresh.output
     # All actions expose the same scope-aware state, including navigation/tabs.
     previous_state = result.state_after
     result.state_before = before
@@ -85,8 +124,8 @@ async def execute(session, action, request, *, approval_token=None):
         async with asyncio.timeout(35):
             async with session.operation():
                 if approval_token:
-                    await session.approvals.consume(approval_token, session, action, request)
-                    session._approved = True
+                    session._approval = await session.approvals.consume(approval_token, session, action, request)
                 return await dispatch(session, action, request)
     except (BrowserError, PlaywrightError, OSError, ValueError, TimeoutError) as exc:
-        return failure(session, action, exc)
+        code = "BROWSER_CRASHED" if isinstance(exc, PlaywrightError) and session._dead else None
+        return failure(session, action, exc, code=code)

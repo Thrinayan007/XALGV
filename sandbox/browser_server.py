@@ -7,10 +7,10 @@ import os
 import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi import Request as Connection
 from playwright.async_api import Error as PlaywrightError
-from pydantic import TypeAdapter
+from pydantic import Field, TypeAdapter
 
 if __package__:  # Package imports in tests; flat imports in the Docker image.
     from .xbrowser import macros
@@ -18,6 +18,7 @@ if __package__:  # Package imports in tests; flat imports in the Docker image.
     from .xbrowser.controller import failure as action_failure
     from .xbrowser.errors import BrowserError
     from .xbrowser.images import image_data
+    from .xbrowser.leases import BrowserLeaseGate
     from .xbrowser.safety import BrowserPolicy
     from .xbrowser.schemas import (
         ApprovalRequest,
@@ -46,6 +47,7 @@ else:
     from xbrowser.controller import failure as action_failure
     from xbrowser.errors import BrowserError
     from xbrowser.images import image_data
+    from xbrowser.leases import BrowserLeaseGate
     from xbrowser.safety import BrowserPolicy
     from xbrowser.schemas import (
         ApprovalRequest,
@@ -87,7 +89,41 @@ async def lifespan(_app):
         await session.control("stop")
 
 
-router = APIRouter(prefix="/tools/browser", tags=["browser"], lifespan=lifespan)
+def _lease_gate():
+    if not hasattr(session, "lease_gate"):
+        session.lease_gate = BrowserLeaseGate()
+    return session.lease_gate
+
+
+async def browser_access(connection: Connection, x_xbrowser_lease: str = Header(default="")):
+    gate = _lease_gate()
+    async with gate.lock:
+        if connection.scope["route"].name != "browser_lease" and not gate.permits(x_xbrowser_lease):
+            raise HTTPException(status_code=423, detail="Browser session is leased or the lease is stale")
+        yield
+
+
+router = APIRouter(prefix="/tools/browser", tags=["browser"], lifespan=lifespan,
+                   dependencies=[Depends(browser_access)])
+
+
+class LeaseRequest(Request):
+    action: str = Field(pattern=r"^(acquire|release)$")
+    owner: str = Field(default="workflow", pattern=r"^[a-zA-Z0-9_:/-]{1,160}$")
+    seconds: int = Field(default=120, ge=1, le=3600)
+
+
+@router.post("/lease", response_model=BrowserResponse)
+async def browser_lease(req: LeaseRequest, x_xbrowser_lease: str = Header(default="")):
+    gate = _lease_gate()
+    if req.action == "release":
+        if not gate.release(x_xbrowser_lease):
+            raise HTTPException(status_code=423, detail="Browser lease is stale")
+        return BrowserResponse(success=True, action="lease")
+    lease = gate.acquire(req.owner, req.seconds)
+    if lease is None:
+        raise HTTPException(status_code=423, detail="Browser session is already leased")
+    return BrowserResponse(success=True, action="lease", data={"token": lease.token})
 
 
 class ContentRequest(Request):
@@ -195,7 +231,7 @@ async def authorize(req: ApprovalRequest, x_xbrowser_admin: str = Header(default
     try:
         step = TypeAdapter(BrowserStep).validate_python({"tool": req.tool, "args": req.args})
         async with session.operation():
-            token = await session.approvals.issue(session, step.tool, step.args)
+            token = await session.approvals.issue(session, step.tool, step.args, req.network_write)
             result = await session.describe("authorize")
             result.data = {"approval_token": token, "expires_in_seconds": 120}
             return result

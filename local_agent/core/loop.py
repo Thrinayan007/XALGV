@@ -20,7 +20,8 @@ import uuid
 from local_agent.config import AgentConfig
 from local_agent.core.browser_progress import BrowserProgress
 from local_agent.core.completion import terminal_response
-from local_agent.core.planner import Planner
+from local_agent.core.planner import Planner, PlanObjective
+from local_agent.core.recovery import RecoveryManager
 from local_agent.core.state import AgentState
 from local_agent.core.task_verification import TaskVerifier
 from local_agent.core.verifier import Verifier
@@ -43,8 +44,8 @@ You have access to tools: {tool_names}.
 - Execute ONE tool call per turn.
 - After each action, wait for the result before deciding the next step.
 - A plan step can require several tools. Finish every part before responding STEP_DONE: <evidence>.
-- A successful tool call alone does not complete a plan step. Use browser_run for deterministic sequences.
-- For a known URL and capture paths, send the entire open/screenshot/scroll sequence in ONE browser_run call. Use viewport captures unless full-page was requested.
+- A successful action or changed page alone cannot pass objective checks. Use browser_run for deterministic sequences.
+- For a known sequence of only open, screenshot, and scroll actions, use one browser_run call. Use viewport captures unless full-page was requested.
 - After browser_run fails, inspect partial results and observe. Never rerun completed steps or repeat an uncertain submission.
 - If a step fails, try a different approach (up to 3 retries).
 - When the goal is achieved, respond with: DONE: <summary of what was accomplished>
@@ -76,6 +77,7 @@ class AgentLoop:
         memory_store: MemoryStore,
         checkpoint_store: CheckpointStore | None = None,
         task_verifier: TaskVerifier | None = None,
+        specialist_prompt: str = "",
     ) -> None:
         self._config = config
         self._model = model_manager
@@ -87,6 +89,7 @@ class AgentLoop:
         self._killed = False
         self._execution_task = None
         self._task_verifier = task_verifier
+        self._specialist_prompt = specialist_prompt
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -96,7 +99,7 @@ class AgentLoop:
         if self._execution_task is not None:
             self._execution_task.cancel()
 
-    async def run(self, goal: str, *, run_id: str | None = None, acceptance_checks=None) -> RunRecord:
+    async def run(self, goal: str, *, run_id: str | None = None, acceptance_checks=None, milestones=None) -> RunRecord:
         """Execute the full agent loop for *goal* and return the run record."""
         run_id = run_id or str(uuid.uuid4())
         self._killed = False
@@ -105,6 +108,7 @@ class AgentLoop:
         state = AgentState(run_id=run_id, goal=goal)
         self._memory.create_run(run_id, goal)
         checks = json.loads(json.dumps(acceptance_checks)) if acceptance_checks is not None else None
+        milestones = json.loads(json.dumps(milestones)) if milestones is not None else None
         self._memory.update_run_metadata(run_id, {
             "acceptance_checks": checks,
             "task_verification": {"status": "pending" if checks else "not_evaluated", "source": "trusted_checks" if checks else "model_assertion"},
@@ -140,6 +144,8 @@ class AgentLoop:
         consecutive_nudges = 0
         announce_task = True
         progress = BrowserProgress()
+        recovery = RecoveryManager()
+        objectives = []
         rejected_completions = 0
 
         try:
@@ -149,17 +155,28 @@ class AgentLoop:
 
             if checks is not None and (not checks or self._task_verifier is None):
                 raise ValueError("Nonempty trusted acceptance checks and a configured TaskVerifier are required")
-            plan, reasoning = await asyncio.wait_for(self._planner.create_plan(goal), budget.remaining_seconds)
-            state.plan = plan
-            self._memory.update_run_plan(run_id, plan)
+            if milestones is not None:
+                if self._task_verifier is None or not isinstance(milestones, list) or not 1 <= len(milestones) <= 8:
+                    raise ValueError("Trusted milestones require 1–8 objectives and a configured TaskVerifier")
+                for milestone in milestones:
+                    if (not isinstance(milestone, dict) or not isinstance(milestone.get("objective"), str)
+                            or not milestone["objective"].strip() or not isinstance(milestone.get("checks"), list)
+                            or not 1 <= len(milestone["checks"]) <= 50):
+                        raise ValueError("Each milestone needs an objective and nonempty checks")
+                    objectives.append(PlanObjective(milestone["objective"], tuple(milestone["checks"])))
+                reasoning = "Caller supplied trusted milestones."
+            else:
+                plan, reasoning = await asyncio.wait_for(self._planner.create_plan(goal), budget.remaining_seconds)
+                objectives = [item if isinstance(item, PlanObjective) else PlanObjective(item) for item in plan]
+            self._set_objectives(state, objectives, milestones is not None)
 
-            logger.info("Plan for '%s': %s", goal, plan)
+            logger.info("Plan for '%s': %s", goal, state.plan)
 
             # Record the planning step.
             plan_step = StepRecord(
                 step_index=0,
                 action_type="plan",
-                decision=f"Plan: {json.dumps(plan)}",
+                decision=f"Plan: {json.dumps(state.plan)}",
                 observation=reasoning,
                 result_success=True,
             )
@@ -192,6 +209,11 @@ class AgentLoop:
                     state_summary=state.summary_for_model(),
                 )
                 working.system_prompt = system
+                if self._specialist_prompt:
+                    working.system_prompt += "\nSpecialist instructions:\n" + self._specialist_prompt
+                objective = objectives[state.current_step] if state.current_step < len(objectives) else None
+                if objective and objective.checks and self._task_verifier:
+                    working.system_prompt += "\nCurrent objective checks: " + json.dumps(objective.checks)
                 if checks:
                     working.system_prompt += "\nTrusted acceptance criteria (all must pass):\n" + json.dumps(checks)
                 working.set_plan(state.plan)
@@ -233,6 +255,8 @@ class AgentLoop:
                         budget.check_capacity(requested_cost)
                         if progress.stalled[progress.stall_key(tc.name, tc.arguments)] >= self._config.max_repeated_actions:
                             raise BudgetExhaustedError("Browser scroll repeatedly reported no movement.")
+                        if progress.unproductive[progress.stall_key(tc.name, tc.arguments)] >= self._config.max_repeated_actions:
+                            raise BudgetExhaustedError("Browser action repeatedly produced no relevant progress. Replan or review the task.")
                     except BudgetExhaustedError as exc:
                         state.status = RunStatus.FAILED
                         state.last_error = exc.reason
@@ -241,7 +265,12 @@ class AgentLoop:
                     logger.info("Step %d: %s(%s)", step_index, tc.name, tc.arguments)
 
                     try:
-                        if tc.name not in available_names:
+                        restriction = recovery.restriction(tc.name, tc.arguments)
+                        if restriction:
+                            result = ToolResult(success=False, output="", error=restriction,
+                                                metadata={"error_code": "RECOVERY_RESTRICTED"})
+                            verification = VerificationResult(status=VerificationStatus.FAILED, message=restriction)
+                        elif tc.name not in available_names:
                             result = ToolResult(success=False, output="", error=(
                                 f"Tool {tc.name} is unavailable in this run. Use only advertised tools. "
                                 "For screenshots use browser_screenshot; for descriptions use describe=true or browser_observe."
@@ -252,11 +281,15 @@ class AgentLoop:
                             result, verification = await asyncio.wait_for(self._execution_task, budget.remaining_seconds)
                     except TimeoutError:
                         result = ToolResult(success=False, output="", error="Run wall-time exhausted during action; outcome uncertain.")
+                        if tc.name.startswith("browser_"):
+                            result.metadata = {"error_code": "ACTION_TIMEOUT", "data": {"outcome_uncertain": True}}
                         verification = VerificationResult(status=VerificationStatus.FAILED, message=result.error)
                     except asyncio.CancelledError:
                         if not self._killed:
                             raise
                         result = ToolResult(success=False, output="", error="Action cancelled; observe before retrying any side effect.")
+                        if tc.name.startswith("browser_"):
+                            result.metadata = {"error_code": "ACTION_TIMEOUT", "data": {"outcome_uncertain": True}}
                         verification = VerificationResult(status=VerificationStatus.FAILED, message=result.error)
                     except PermissionDeniedError as exc:
                         # Tool needs human approval.
@@ -279,6 +312,11 @@ class AgentLoop:
                     finally:
                         self._execution_task = None
 
+                    # Record three separate signals and apply recovery before the next model turn.
+                    signals = progress.record(tc.name, tc.arguments, result)
+                    recovery_kind, recovery_hint = recovery.record(tc.name, tc.arguments, result)
+                    if signals:
+                        signals["action_success"] = result.success and verification.status != VerificationStatus.FAILED
                     # Record the step.
                     step_rec = StepRecord(
                         step_index=step_index,
@@ -287,7 +325,10 @@ class AgentLoop:
                         tool_params=execution_params,
                         decision=response.content,
                         result_output=result.output,
-                        result_metadata={**result.metadata, "artifacts": result.artifacts},
+                        result_metadata={**result.metadata, "artifacts": result.artifacts,
+                                         **({"progress": signals} if signals else {}),
+                                         **({"recovery": recovery_kind} if recovery_kind else {}),
+                                         **({"browser_mutation_uncertain": True} if recovery.uncertain_mutation else {})},
                         result_success=result.success,
                         verification_status=verification.status.value,
                         verification_message=verification.message,
@@ -301,7 +342,6 @@ class AgentLoop:
                         if isinstance(attempted, int) and 0 <= attempted <= requested_cost:
                             actual_cost = attempted
                     budget.record_step(action_key, cost=actual_cost)
-                    progress.record(tc.name, tc.arguments, result)
 
                     # Preserve the assistant's original tool-call message.
                     working.add_message(
@@ -319,10 +359,17 @@ class AgentLoop:
                         + f"\nVerification: {verification.status.value} — {verification.message}",
                         metadata=result.metadata, success=result.success,
                     )
+                    if recovery_hint:
+                        working.add_message("user", recovery_hint)
 
                     # ── Decide next action based on result ───────────────
+                    if recovery_kind in {"human", "stop"}:
+                        state.status = RunStatus.AWAITING_HUMAN if recovery_kind == "human" else RunStatus.FAILED
+                        state.last_error = result.error or recovery_hint
+                        break
                     if result.success and verification.status != VerificationStatus.FAILED:
-                        state.retry_count = 0
+                        if not signals or signals["relevant_state_progress"] or tc.name in {"browser_run", "browser_screenshot"}:
+                            state.retry_count = 0
                         state.last_error = None
                         state.successful_actions_current_step += 1
                         announce_task = False
@@ -334,12 +381,24 @@ class AgentLoop:
                         state.last_error = result.error
                     else:
                         state.mark_retry(result.error or verification.message)
-                        if state.retry_count >= self._config.max_retries_per_step:
+                        max_retries = min(self._config.max_retries_per_step,
+                                          objective.max_retries or self._config.max_retries_per_step) if objective else self._config.max_retries_per_step
+                        if state.retry_count >= max_retries:
+                            if recovery.uncertain_mutation:
+                                state.status = RunStatus.AWAITING_HUMAN
+                                state.last_error = "A prior browser mutation may have completed. Verify its outcome before retrying."
+                                break
                             logger.warning("Max retries for step %d, re-planning", state.current_step)
                             try:
-                                new_plan, _reason = await asyncio.wait_for(self._planner.replan(state), budget.remaining_seconds)
-                                state.plan = state.plan[: state.current_step] + new_plan
-                                self._memory.update_run_plan(run_id, state.plan)
+                                new_plan, _ = await asyncio.wait_for(self._planner.replan(state), budget.remaining_seconds)
+                                alternatives = [item if isinstance(item, PlanObjective) else PlanObjective(item) for item in new_plan]
+                                if any(item.checks for item in objectives[state.current_step:]):
+                                    working.add_message("user", "Try a different approach while preserving the objective checks: "
+                                                        + alternatives[0].objective)
+                                else:
+                                    objectives[state.current_step:] = alternatives
+                                    self._set_objectives(state, objectives, milestones is not None)
+                                state.successful_actions_current_step = 0
                                 state.retry_count = 0
                             except Exception:
                                 logger.exception("Re-planning failed")
@@ -361,6 +420,24 @@ class AgentLoop:
                     content = terminal_response(content)
                     if content.upper().startswith("DONE:"):
                         accepted = True
+                        if recovery.uncertain_mutation and not checks:
+                            state.status = RunStatus.AWAITING_HUMAN
+                            state.last_error = "A browser mutation may have completed. Trusted outcome checks or human review are required."
+                            break
+                        pending = objectives[state.current_step:]
+                        if self._task_verifier and (milestones is not None or not checks) and any(item.checks for item in pending):
+                            if len(pending) == 1 and await self._verify_objective(
+                                state, pending[0], budget, trusted=milestones is not None,
+                            ):
+                                state.advance()
+                            else:
+                                rejected_completions += 1
+                                working.add_message("user", "Remaining objective checks have not passed. Use STEP_DONE after verifying the next objective.")
+                                announce_task = False
+                                if rejected_completions >= max_nudges:
+                                    state.status = RunStatus.FAILED
+                                    state.last_error = "Checked objectives are still incomplete."
+                                continue
                         if checks:
                             task_result = await asyncio.wait_for(self._task_verifier.verify(checks), budget.remaining_seconds)
                             accepted = task_result.status == VerificationStatus.PASSED
@@ -386,17 +463,26 @@ class AgentLoop:
                             state.status = RunStatus.COMPLETED
                             state.scratchpad = content[5:].strip()
                     elif content.upper().startswith("STEP_DONE:"):
-                        if state.successful_actions_current_step:
+                        objective_verified = None
+                        if objective and objective.checks and self._task_verifier:
+                            objective_verified = await self._verify_objective(
+                                state, objective, budget, trusted=milestones is not None,
+                            )
+                        if objective_verified is True or (
+                            objective_verified is None and state.successful_actions_current_step and not recovery.uncertain_mutation
+                        ):
                             state.advance()
+                            progress.reset_objective()
                             consecutive_nudges = 0
                             working.add_message("assistant", content)
                         else:
                             consecutive_nudges += 1
                             if consecutive_nudges >= max_nudges:
                                 state.status = RunStatus.FAILED
-                                state.last_error = "Plan completion repeatedly claimed without successful action evidence."
+                                state.last_error = "Plan completion repeatedly claimed without passing objective evidence."
                             else:
-                                working.add_message("user", "No successful action evidence for this step. Continue working before STEP_DONE.")
+                                working.add_message("user", "Objective checks did not pass. Verify or repair the outcome before STEP_DONE."
+                                                    if objective_verified is False else "No successful action evidence for this step. Continue working before STEP_DONE.")
                                 announce_task = False
                     elif content.upper().startswith("BLOCKED:"):
                         state.status = RunStatus.AWAITING_HUMAN
@@ -460,6 +546,28 @@ class AgentLoop:
         return self._memory.get_run(run_id)  # type: ignore[return-value]
 
     # ── Internal helpers ─────────────────────────────────────────────────
+
+    def _set_objectives(self, state, objectives, trusted):
+        state.plan = [item.objective for item in objectives]
+        self._memory.update_run_plan(state.run_id, state.plan)
+        self._memory.update_run_metadata(state.run_id, {"objectives": [
+            {"objective": item.objective, "checks": item.checks, "max_retries": item.max_retries,
+             "source": "trusted_milestone" if trusted else "planner"}
+            for item in objectives
+        ]})
+
+    async def _verify_objective(self, state, objective, budget, *, trusted):
+        result = await asyncio.wait_for(self._task_verifier.verify(list(objective.checks)), budget.remaining_seconds)
+        passed = result.status == VerificationStatus.PASSED
+        step = StepRecord(
+            step_index=len(state.history), action_type="objective_verification", result_success=passed,
+            verification_status=result.status.value, verification_message=result.message,
+            result_metadata={"objective": objective.objective, "goal_progress": "passed" if passed else "failed",
+                             "source": "trusted_milestone" if trusted else "planner", "evidence": result.evidence},
+        )
+        state.record(step)
+        self._memory.record_step(state.run_id, step)
+        return passed
 
     def _save_checkpoint(self, state: AgentState, working: WorkingMemory) -> None:
         cp = Checkpoint(

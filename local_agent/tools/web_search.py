@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from dataclasses import asdict
 from typing import Any
 
 from local_agent.security.permissions import PermissionTier
@@ -31,6 +33,7 @@ class WebSearchTool(Tool):
         trace_dir: str = "traces",
         *,
         search_mode: SearchMode = SearchMode.ON,
+        task_id: str = "agent",
     ) -> None:
         try:
             client = SearxNGClient(base_url)
@@ -42,6 +45,7 @@ class WebSearchTool(Tool):
         self._trace = TraceStore(trace_dir)
         self._service = WebSearchService(client, self._trace) if client else None
         self._mode = search_mode
+        self._task_id = task_id
 
     @property
     def name(self) -> str:
@@ -97,9 +101,9 @@ class WebSearchTool(Tool):
             request = SearchRequest(
                 query=query,
                 max_results=max_results,
-                task_id="agent",
+                task_id=self._task_id,
             )
-            response = self._service.execute(request, self._mode, approved_for_task=True)
+            response = await asyncio.to_thread(self._service.execute, request, self._mode, True)
 
             # Format results for the agent.
             lines: list[str] = []
@@ -117,6 +121,8 @@ class WebSearchTool(Tool):
                 metadata={
                     "request_id": response.request_id,
                     "result_count": len(response.results),
+                    "retrieved_at": response.retrieved_at,
+                    "sources": [asdict(item) for item in response.results],
                 },
             )
 
@@ -124,7 +130,7 @@ class WebSearchTool(Tool):
             return ToolResult(success=False, output="", error=f"Search disabled: {exc}")
         except SearchPolicyError as exc:
             return ToolResult(success=False, output="", error=f"Search policy error: {exc}")
-        except Exception as exc:
+        except (OSError, TypeError, ValueError) as exc:
             return ToolResult(success=False, output="", error=f"Search error: {exc}")
 
     async def verify(self, params: dict[str, Any], result: ToolResult) -> VerificationResult:

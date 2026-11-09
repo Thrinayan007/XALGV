@@ -1,6 +1,7 @@
 import pytest
 
 from sandbox.xbrowser import actions
+from sandbox.xbrowser.controller import dispatch
 from sandbox.xbrowser.errors import BrowserError
 from sandbox.xbrowser.observe import observe
 from sandbox.xbrowser.schemas import ClickRequest, ObserveRequest, TypeRequest
@@ -73,6 +74,52 @@ async def test_changed_target_is_rejected_before_dispatch(browser, site, change)
             await actions.click(browser, page, click_request(result, target))
         assert error.value.code == "STALE_REF"
         assert await page.evaluate("window.clicked") is None
+
+
+@pytest.mark.parametrize("duplicate", [False, True])
+async def test_hybrid_recovers_only_a_unique_detached_reference(browser, site, duplicate):
+    await browser.open(f"{site}/marks.html")
+    async with browser.operation() as page:
+        result = await snapshot(browser, page)
+        target = element(result, "Dynamic action")
+        await page.locator("#dynamic").evaluate("""(el, duplicate) => {
+            const replacements = [el.cloneNode(true)];
+            if (duplicate) replacements.push(el.cloneNode(true));
+            el.replaceWith(...replacements);
+        }""", duplicate)
+        clicked = await dispatch(browser, "click", ClickRequest(
+            ref=target["ref"], snapshot_id=result.snapshot_id,
+            semantic_target={"role": "button", "name": "Dynamic action", "frame_id": "f1"},
+        ))
+        if duplicate:
+            assert clicked.error_code == "AMBIGUOUS_TARGET"
+            assert clicked.snapshot_id and clicked.snapshot_id != result.snapshot_id
+            assert clicked.data["observation"]["elements"]
+            assert await page.evaluate("window.clicked") is None
+        else:
+            assert clicked.success and clicked.action_verification["target_strategy"] == "semantic_recovery"
+            assert await page.evaluate("window.clicked") == "original"
+
+
+async def test_semantic_group_context_and_nested_scroll(browser, site):
+    await browser.open(f"{site}/marks.html")
+    async with browser.operation() as page:
+        await page.locator("body").evaluate("""el => el.innerHTML = `
+            <fieldset><legend>Billing</legend><button>Save</button></fieldset>
+            <fieldset><legend>Shipping</legend>
+                <div aria-label="Shipping controls" style="height:30px;overflow:auto">
+                    <div style="height:100px"></div>
+                    <button onclick="window.clicked='shipping'">Save</button>
+                </div>
+            </fieldset>`""")
+        viewport = await snapshot(browser, page)
+        assert element(viewport, "Shipping controls")["scrollable"]
+        assert len([item for item in viewport.data["elements"] if item["name"] == "Save"]) == 1
+        result = await dispatch(browser, "click", ClickRequest(
+            semantic_target={"role": "button", "name": "Save", "nearby_label": "Shipping"},
+        ))
+        assert result.success and result.action_verification["target_strategy"] == "semantic"
+        assert await page.evaluate("window.clicked") == "shipping"
 
 
 async def test_old_snapshot_tab_and_navigation_are_rejected(browser, site):

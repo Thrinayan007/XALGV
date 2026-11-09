@@ -182,6 +182,44 @@ async def test_trusted_acceptance_allows_verified_completion(tmp_path):
     assert run.status == RunStatus.COMPLETED and run.metadata["task_verification"]["status"] == "passed"
 
 
+async def test_changed_browser_state_cannot_pass_an_objective(tmp_path):
+    class Verifier:
+        async def verify(self, checks):
+            assert checks == [{"kind": "url_host", "expected": "docs.python.org"}]
+            return VerificationResult(status=VerificationStatus.FAILED, message="Wrong host")
+
+    model = Model([response(tool="browser_scroll"), *[response("STEP_DONE: found it")] * 3])
+    loop = make_loop(tmp_path, model, Sandbox())
+    loop._task_verifier = Verifier()
+    run = await loop.run("Find the tutorial", milestones=[{
+        "objective": "Reach the Python docs",
+        "checks": [{"kind": "url_host", "expected": "docs.python.org"}],
+    }])
+    assert run.status == RunStatus.FAILED
+    assert run.steps[1].result_metadata["progress"]["relevant_state_progress"]
+    assert all(step.result_metadata["goal_progress"] == "failed" for step in run.steps
+               if step.action_type == "objective_verification")
+
+
+async def test_uncertain_macro_cannot_be_retried_with_changed_arguments(tmp_path):
+    class InterruptedSandbox(Sandbox):
+        async def browser_run(self, **kwargs):
+            self.calls.append(kwargs)
+            return ToolResult(success=False, output="", error="Submission timed out", metadata={
+                "error_code": "ACTION_TIMEOUT", "data": {"attempted_actions": 1, "outcome_uncertain": True},
+            })
+
+    sandbox = InterruptedSandbox()
+    steps = [{"tool": "press", "args": {"key": "Enter"}}]
+    model = Model([response(tool="browser_run", args={"steps": steps}),
+                   response(tool="browser_run", args={"steps": steps, "timeout_ms": 500}),
+                   response("DONE: submitted")])
+    run = await make_loop(tmp_path, model, sandbox).run("Submit the form")
+    assert run.status == RunStatus.AWAITING_HUMAN
+    assert len(sandbox.calls) == 1
+    assert run.steps[2].result_metadata["error_code"] == "RECOVERY_RESTRICTED"
+
+
 def test_profile_documents_are_excluded_from_ingestion(tmp_path):
     from local_agent.rag import DocumentParser
     profile = tmp_path / ".xbrowser" / "scope" / "profile" / "cookies.txt"

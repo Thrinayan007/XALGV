@@ -90,11 +90,15 @@ async def cmd_run(args: argparse.Namespace) -> int:
     try:
         acceptance_path = getattr(args, "acceptance", None)
         checks = None
+        milestones = None
         if acceptance_path:
             from pathlib import Path
             data = json.loads(Path(acceptance_path).read_text(encoding="utf-8"))
-            checks = data["checks"] if isinstance(data, dict) else data
-        result = await loop.run(args.goal, acceptance_checks=checks)
+            checks = data.get("checks") if isinstance(data, dict) else data
+            milestones = data.get("milestones") if isinstance(data, dict) else None
+            if checks is None and milestones is None:
+                raise ValueError("Acceptance file must contain checks or milestones")
+        result = await loop.run(args.goal, acceptance_checks=checks, milestones=milestones)
         print(f"\n{'='*60}")
         print(f"Run ID:  {result.run_id}")
         print(f"Status:  {result.status.value}")
@@ -262,6 +266,16 @@ def cli_main() -> int:
     run_parser.add_argument("--acceptance", help="Trusted JSON file of deterministic acceptance checks.")
     run_parser.add_argument("--allow-execution", action="store_true", help="Trust shell/Python SYSTEM tools for this run; requires configured sandbox admin credentials.")
 
+    workflow_parser = subparsers.add_parser("multi-run", help="Execute a verified specialist workflow.")
+    workflow_parser.add_argument("goal")
+    workflow_parser.add_argument("--contract", required=True, help="Trusted workflow JSON file.")
+    inspect_parser = subparsers.add_parser("multi-inspect", help="Read one workflow's durable journal.")
+    inspect_parser.add_argument("run_id")
+    resume_parser = subparsers.add_parser("multi-resume", help="Resume a workflow from its durable journal.")
+    resume_parser.add_argument("run_id")
+    resume_parser.add_argument("--confirm-outcome", action="append", default=[], metavar="TASK",
+                               help="Confirm you independently reviewed the effects of this uncertain task.")
+
     # eval
     eval_parser = subparsers.add_parser("eval", help="Run the evaluation harness.")
     eval_parser.add_argument("--category", help="Only run tasks of this category.")
@@ -285,6 +299,14 @@ def cli_main() -> int:
 
     if args.command == "run":
         return asyncio.run(cmd_run(args))
+    elif args.command in {"multi-run", "multi-resume"}:
+        from local_agent.agents.cli import run_workflow
+
+        return asyncio.run(run_workflow(args))
+    elif args.command == "multi-inspect":
+        from local_agent.agents.cli import inspect_workflow
+
+        return inspect_workflow(args)
     elif args.command == "eval":
         return asyncio.run(cmd_eval(args))
     elif args.command == "search":

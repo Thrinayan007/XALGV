@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import socket
 from urllib.parse import quote
 
@@ -7,7 +8,7 @@ import pytest
 from sandbox.xbrowser.controller import execute
 from sandbox.xbrowser.errors import BrowserError
 from sandbox.xbrowser.safety import BrowserPolicy
-from sandbox.xbrowser.schemas import ClickRequest, OpenRequest, PressRequest, TypeRequest
+from sandbox.xbrowser.schemas import ClickRequest, NetworkWrite, OpenRequest, PressRequest, TypeRequest
 
 
 @pytest.mark.parametrize("url", ["http://127.0.0.1", "http://[::1]", "http://169.254.169.254", "http://10.0.0.1",
@@ -47,6 +48,20 @@ async def test_redirect_and_subresource_cannot_bypass_private_network_policy(bro
         assert blocked
 
 
+async def test_reachable_loopback_alias_requires_its_own_exception(browser, site):
+    allowed = site.replace("127.0.0.1", "localhost")
+    browser.policy = BrowserPolicy(local_origins=(allowed,))
+    assert (await browser.open(f"{allowed}/first.html")).success
+    async with browser.operation() as page:
+        assert await page.evaluate("""async url => {
+            try { await fetch(url, {mode:'no-cors'}); return false; } catch { return true; }
+        }""", f"{site}/first.html")
+    denied = await execute(browser, "open", OpenRequest(
+        url=f"{allowed}/redirect?target={quote(f'{site}/first.html', safe='')}",
+    ))
+    assert not denied.success
+
+
 async def test_sensitive_actions_fail_closed_and_single_use_approval_is_scoped(browser, site):
     await browser.open(f"{site}/sensitive.html")
     request = TypeRequest(selector="#password", text="do-not-echo")
@@ -76,6 +91,38 @@ async def test_scripted_network_write_is_blocked_without_approval(browser, site)
             try { await fetch('/submitted', {method:'POST',body:'write'}); return false; } catch { return true; }
         }""")
     assert any(event.get("code") == "HUMAN_APPROVAL_REQUIRED" for event in browser.events)
+
+
+@pytest.mark.parametrize("endpoint", ["reviewed-write", "reviewed-redirect"])
+async def test_approval_only_sends_reviewed_top_level_post(browser, site, endpoint):
+    await browser.open(f"{site}/first.html")
+    request = ClickRequest(selector="#continue")
+    async with browser.operation() as page:
+        await page.evaluate("""endpoint => {
+            document.body.innerHTML = `<form method="post" action="/${endpoint}">
+                <input name="value" value="reviewed">
+                <button id="continue">Continue</button></form>`;
+            document.querySelector('button').addEventListener('click', () => {
+                fetch('/' + endpoint, {method: 'POST', body: 'value=reviewed',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+                    .catch(() => {});
+            });
+        }""", endpoint)
+    denied = await execute(browser, "click", request)
+    assert denied.error_code == "HUMAN_APPROVAL_REQUIRED"
+    async with browser.operation():
+        token = await browser.approvals.issue(browser, "click", request, NetworkWrite(
+            method="POST", url=f"{site}/{endpoint}", body_sha256=hashlib.sha256(b"value=reviewed").hexdigest(),
+        ))
+    approved = await execute(browser, "click", request, approval_token=token)
+    assert any(event.get("code") == "HUMAN_APPROVAL_REQUIRED" for event in browser.events)
+    if endpoint == "reviewed-redirect":
+        assert approved.error_code == "SUBMISSION_UNCERTAIN", repr(list(browser.events))
+        assert approved.data["outcome_uncertain"]
+    else:
+        assert approved.success
+        async with browser.operation() as page:
+            assert "Reviewed form reached the server" in await page.locator("body").inner_text(), repr(list(browser.events))
 
 
 @pytest.mark.parametrize("key", ["Control+L", "Control+O", "Control+Shift+J", "F12", "Alt+F4", "Control+S"])

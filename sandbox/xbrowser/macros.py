@@ -43,7 +43,8 @@ async def run(session, request):
                         async with asyncio.timeout(30):
                             result = await dispatch(session, step.tool, step.args)
                     except (BrowserError, PlaywrightError, OSError, ValueError, TimeoutError) as exc:
-                        result = failure(session, step.tool, exc)
+                        code = "BROWSER_CRASHED" if isinstance(exc, PlaywrightError) and session._dead else None
+                        result = failure(session, step.tool, exc, code=code)
                     results.append(result)
                     current = None
                     if not result.success:
@@ -61,6 +62,8 @@ async def run(session, request):
     success = failed_index is None
     failed = results[-1] if not success else None
     output = "\n".join(f"{index + 1}. {item.action}: {'ok' if item.success else item.error_code}" for index, item in enumerate(results))
+    if failed and failed.snapshot_id and "observation" in failed.data:
+        output += "\n" + failed.output
     artifacts = [path for item in results for path in item.artifacts]
     if artifacts:
         output += "\nArtifacts:\n" + "\n".join(artifacts)

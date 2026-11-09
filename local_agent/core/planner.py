@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 
 from local_agent.core.state import AgentState
 from local_agent.models import ModelManager
@@ -39,9 +40,12 @@ Do not plan Python/OCR or installation for normal page descriptions.
 
 Respond with ONLY a JSON object:
 {
-  "plan": ["step 1 description", "step 2 description", ...],
+  "plan": [{"objective": "Find the tutorial", "success_conditions": {"url_host": "docs.python.org", "page_text_contains": "Python Tutorial"}, "max_retries": 3}],
   "reasoning": "Brief explanation of the approach"
 }
+Use success_conditions only when you can name an observable outcome for the objective.
+Supported keys are url (exact), url_host (exact hostname), url_contains, and page_text_contains.
+Omit conditions when the outcome needs human judgment. Never use generic page changes as proof.
 """
 
 REPLAN_SYSTEM_PROMPT = """\
@@ -51,10 +55,35 @@ REVISED plan for the remaining work.  Keep it short (at most 6 new steps).
 
 Respond with ONLY a JSON object:
 {
-  "plan": ["next step 1", "next step 2", ...],
+  "plan": [{"objective": "next step", "success_conditions": {"url": "https://example.org/result"}}],
   "reasoning": "Why the plan changed"
 }
+Use the same conditions as the original planner: url, url_host, url_contains, page_text_contains.
 """
+
+
+@dataclass(frozen=True)
+class PlanObjective:
+    objective: str
+    checks: tuple[dict, ...] = ()
+    max_retries: int | None = None
+
+    @classmethod
+    def parse(cls, step):
+        if isinstance(step, str) and step.strip():
+            return cls(step.strip()[:160])
+        if not isinstance(step, dict) or not isinstance(step.get("objective"), str) or not step["objective"].strip():
+            return None
+        kinds = {"url": "url", "url_host": "url_host", "url_contains": "url_contains", "page_text_contains": "text"}
+        conditions = step.get("success_conditions")
+        checks = tuple(
+            {"kind": kinds[key], "expected": value.strip()}
+            for key, value in conditions.items()
+            if key in kinds and isinstance(value, str) and 0 < len(value.strip()) <= 500
+        ) if isinstance(conditions, dict) else ()
+        retries = step.get("max_retries")
+        retries = retries if type(retries) is int and 1 <= retries <= 3 else None
+        return cls(step["objective"].strip()[:160], checks, retries)
 
 
 class Planner:
@@ -70,7 +99,7 @@ class Planner:
             prompt += "\nAvailable tools for this run: " + ", ".join(self._tool_names)
         return prompt
 
-    async def create_plan(self, goal: str) -> tuple[list[str], str]:
+    async def create_plan(self, goal: str) -> tuple[list[str | PlanObjective], str]:
         """Generate an initial plan for *goal*.
 
         Returns ``(plan_steps, reasoning)``.
@@ -82,7 +111,7 @@ class Planner:
         response = await self._model.chat("planner", messages, max_tokens=1024)
         return self._parse_plan(response.content)
 
-    async def replan(self, state: AgentState) -> tuple[list[str], str]:
+    async def replan(self, state: AgentState) -> tuple[list[str | PlanObjective], str]:
         """Revise the plan based on current state and errors.
 
         Returns ``(new_remaining_steps, reasoning)``.
@@ -99,7 +128,7 @@ class Planner:
         response = await self._model.chat("planner", messages, max_tokens=1024)
         return self._parse_plan(response.content)
 
-    def _parse_plan(self, content: str) -> tuple[list[str], str]:
+    def _parse_plan(self, content: str) -> tuple[list[str | PlanObjective], str]:
         """Extract a valid, non-empty plan from the model response."""
 
         text = (content or "").strip()
@@ -120,11 +149,11 @@ class Planner:
                 reasoning = data.get("reasoning", "")
 
                 if isinstance(plan, list):
-                    valid_plan = [
-                        step.strip()
-                        for step in plan
-                        if isinstance(step, str) and step.strip()
-                    ]
+                    valid_plan = []
+                    for step in plan:
+                        objective = PlanObjective.parse(step)
+                        if objective:
+                            valid_plan.append(step.strip() if isinstance(step, str) else objective)
 
                     if valid_plan:
                         return valid_plan[:self._max_steps], str(reasoning or "")

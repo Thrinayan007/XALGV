@@ -36,10 +36,32 @@ INSPECT = r"""el => {
         el.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}) &&
         style.visibility !== 'hidden' && style.visibility !== 'collapse' && style.display !== 'none' &&
         style.opacity !== '0' && type !== 'hidden' && !el.closest('[inert]');
-    const in_viewport = rect.bottom > 0 && rect.right > 0 && rect.top < innerHeight && rect.left < innerWidth;
+    const parent = node => node.assignedSlot || node.parentElement || node.getRootNode().host;
+    let left=Math.max(0,rect.left), top=Math.max(0,rect.top);
+    let right=Math.min(innerWidth,rect.right), bottom=Math.min(innerHeight,rect.bottom);
+    let nearby_label='';
+    for (let node=parent(el); node; node=parent(node)) {
+        if (!nearby_label && node.matches('fieldset,section,article,tr,li,[role=group],[role=region],[role=dialog]')) {
+            nearby_label=clean((node.getAttribute('aria-labelledby') || '').split(/\s+/)
+                .map(id => node.getRootNode().getElementById?.(id)?.textContent || '').join(' ')) ||
+                clean(node.getAttribute('aria-label') || node.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > th')?.textContent);
+        }
+        if (node === document.body || node === document.documentElement) continue;
+        const css=getComputedStyle(node);
+        const box=node.getBoundingClientRect();
+        if (css.overflowX !== 'visible') {
+            left=Math.max(left,box.left+node.clientLeft);
+            right=Math.min(right,box.left+node.clientLeft+node.clientWidth);
+        }
+        if (css.overflowY !== 'visible') {
+            top=Math.max(top,box.top+node.clientTop);
+            bottom=Math.min(bottom,box.top+node.clientTop+node.clientHeight);
+        }
+    }
+    const in_viewport = right > left && bottom > top;
     // Test a point within the visible portion, then pierce open shadow roots.
-    const x = (Math.max(0,rect.left)+Math.min(innerWidth,rect.right))/2;
-    const y = (Math.max(0,rect.top)+Math.min(innerHeight,rect.bottom))/2;
+    const x = (left+right)/2;
+    const y = (top+bottom)/2;
     let hit = in_viewport ? document.elementFromPoint(x,y) : null;
     while (hit?.shadowRoot) {
         const deeper = hit.shadowRoot.elementFromPoint(x,y);
@@ -47,11 +69,15 @@ INSPECT = r"""el => {
         hit = deeper;
     }
     let covered = in_viewport;
-    for (let current=hit; current; current=current.parentNode || current.host) {
+    for (let current=hit; current; current=parent(current)) {
         if (current === el) { covered=false; break; }
     }
     const disabled = !!el.disabled || el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true';
-    return {role, name:name.slice(0,80), tag, type, visible, in_viewport, covered, disabled,
+    const scrollable = (/(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight) ||
+        (/(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth);
+    return {role, name:name.slice(0,80), name_truncated:name.length>80,
+        nearby_label:nearby_label.slice(0,100), nearby_truncated:nearby_label.length>100,
+        connected:el.isConnected, scrollable, tag, type, visible, in_viewport, covered, disabled,
         checked:['checkbox','radio'].includes(type)?el.checked:
             (el.hasAttribute('aria-checked')?el.getAttribute('aria-checked')==='true':null),
         value:(type === 'password' || /^(cc-|transaction-)/i.test(el.autocomplete || '') ||
@@ -68,14 +94,21 @@ COLLECT = """({scope, limit}) => {
     const roles = new Set(['button','link','tab','menuitem','menuitemcheckbox','menuitemradio',
         'checkbox','radio','textbox','searchbox','combobox','listbox','option','switch','slider','spinbutton','treeitem']);
     const elements=[], info=[];
-    let above=0, below=0, covered=0, visited=0, truncated=false;
+    const counts=new Map(), groupCounts=new Map();
+    const key = data => JSON.stringify([data.role,data.name]);
+    const groupKey = data => JSON.stringify([data.role,data.name,data.nearby_label]);
+    let above=0, below=0, covered=0, visited=0, truncated=false, walkLimited=false;
     const walk = root => {
         for (const el of root.querySelectorAll('*')) {
-            if (++visited > 12000) { truncated=true; return; }
+            if (++visited > 12000) { truncated=true; walkLimited=true; return; }
             if (el.matches(selector) && (el.matches('a[href],button,input,textarea,select,summary,[onclick]') ||
-                roles.has(el.getAttribute('role')) || el.tabIndex >= 0 || el.isContentEditable)) {
+                roles.has(el.getAttribute('role')) || el.tabIndex >= 0 || el.isContentEditable) ||
+                (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) &&
+                !el.matches('html,body') && /auto|scroll/.test(getComputedStyle(el).overflow)) {
                 const data=inspect(el);
                 if (data.visible) {
+                    counts.set(key(data),(counts.get(key(data)) || 0)+1);
+                    groupCounts.set(groupKey(data),(groupCounts.get(groupKey(data)) || 0)+1);
                     if (data.bbox.y + data.bbox.height <= 0) above++;
                     else if (data.bbox.y >= innerHeight) below++;
                     if (data.in_viewport && data.covered) covered++;
@@ -89,6 +122,10 @@ COLLECT = """({scope, limit}) => {
         }
     };
     walk(document);
+    for (const data of info) {
+        data.unique_name=!walkLimited && counts.get(key(data))===1;
+        data.unique_group=!walkLimited && groupCounts.get(groupKey(data))===1;
+    }
     return {elements, meta:{info, above, below, covered, truncated}};
 }""".replace("INSPECT", INSPECT)
 
@@ -98,6 +135,7 @@ class Reference:
     handle: Any
     info: dict
     frame_id: str
+    frame: Any = None
 
 
 @dataclass
@@ -144,7 +182,7 @@ class ReferenceRegistry:
         self._snapshots[tab_id] = snapshot
         return snapshot
 
-    async def resolve(self, session, snapshot_id: str, ref: int):
+    def lookup(self, session, snapshot_id: str, ref: int):
         snapshot = self._snapshots.get(session.tabs.active)
         if (snapshot is None or not snapshot.valid or snapshot.snapshot_id != snapshot_id or
                 snapshot.session_id != session.session_id or snapshot.generation != session.generation):
@@ -152,28 +190,75 @@ class ReferenceRegistry:
         reference = snapshot.refs.get(ref)
         if reference is None:
             raise BrowserError("INVALID_REF", "Reference was not reported in this snapshot; call browser_observe")
+        return reference
+
+    async def resolve(self, session, snapshot_id: str, ref: int):
+        reference = self.lookup(session, snapshot_id, ref)
         try:
             current = await reference.handle.evaluate(INSPECT)
         except PlaywrightError as exc:
             raise BrowserError("STALE_REF", "Target document changed; call browser_observe") from exc
-        if not current["visible"] or current["identity"] != reference.info["identity"]:
+        if not current["connected"]:
+            raise BrowserError("STALE_REF", "Target was detached; call browser_observe")
+        if (not current["visible"] or current["identity"] != reference.info["identity"] or
+                current["nearby_label"] != reference.info["nearby_label"]):
             raise BrowserError("STALE_REF", "Target was removed, hidden, or changed identity; call browser_observe")
         if current["disabled"] or current["covered"]:
             raise BrowserError("TARGET_NOT_ACTIONABLE", "Target is disabled or covered; call browser_observe")
-        frame = await reference.handle.owner_frame()
-        try:
-            while frame and frame.parent_frame:
-                host = await frame.frame_element()
-                try:
-                    geometry = await host.evaluate(INSPECT)
-                    if not geometry["visible"] or geometry["covered"]:
-                        raise BrowserError("TARGET_NOT_ACTIONABLE", "Target frame is hidden or covered; call browser_observe")
-                finally:
-                    await host.dispose()
-                frame = frame.parent_frame
-        except PlaywrightError as exc:
-            raise BrowserError("STALE_REF", "Target frame changed; call browser_observe") from exc
+        await validate_frame(await reference.handle.owner_frame())
         return reference.handle
+
+
+async def validate_frame(frame):
+    if frame is None or frame.is_detached():
+        raise BrowserError("STALE_REF", "Target frame changed; call browser_observe")
+    try:
+        while frame.parent_frame:
+            host = await frame.frame_element()
+            try:
+                geometry = await host.evaluate(INSPECT)
+                if not geometry["visible"] or geometry["covered"]:
+                    raise BrowserError("TARGET_NOT_ACTIONABLE", "Target frame is hidden or covered; call browser_observe")
+            finally:
+                await host.dispose()
+            frame = frame.parent_frame
+    except PlaywrightError as exc:
+        raise BrowserError("STALE_REF", "Target frame changed; call browser_observe") from exc
+
+
+async def resolve_semantic(frame, target, original=None):
+    """Return a pinned handle only after checking all exact matches in the frame."""
+    await validate_frame(frame)
+    locator = frame.get_by_role(target.role, name=target.name, exact=True)
+    if await locator.count() > 32:
+        raise BrowserError("AMBIGUOUS_TARGET", "Too many exact semantic matches")
+    handles = await locator.element_handles()
+    selected = None
+    try:
+        if len(handles) > 32:
+            raise BrowserError("AMBIGUOUS_TARGET", "Too many exact semantic matches")
+        matches = []
+        for handle in handles:
+            info = await handle.evaluate(INSPECT)
+            if target.nearby_label and (info["nearby_truncated"] or info["nearby_label"] != target.nearby_label):
+                continue
+            matches.append((handle, info))
+        if len(matches) != 1:
+            code = "AMBIGUOUS_TARGET" if matches else "SEMANTIC_TARGET_NOT_FOUND"
+            raise BrowserError(code, "Expected one exact semantic match in the target frame")
+        handle, info = matches[0]
+        if original and (info["identity"] != original["identity"] or
+                         info["nearby_label"] != original["nearby_label"] or info["nearby_truncated"]):
+            raise BrowserError("STALE_REF", "Semantic match does not preserve the observed identity")
+        if not info["visible"] or info["disabled"] or info["covered"]:
+            raise BrowserError("TARGET_NOT_ACTIONABLE", "Semantic match is hidden, disabled, or covered")
+        selected = handle
+        return selected
+    finally:
+        for handle in handles:
+            if handle is not selected:
+                with suppress(PlaywrightError):
+                    await handle.dispose()
 
 
 async def discover(page, *, scope: str, limit: int = 120):
@@ -237,7 +322,7 @@ async def _discover(page, *, scope, limit, found):
                     box["y"] < viewport["height"] and box["y"] + box["height"] > 0 and
                     box["x"] < viewport["width"] and box["x"] + box["width"] > 0
                 )
-                found.append(Reference(handle.as_element(), info, f"f{index}"))
+                found.append(Reference(handle.as_element(), info, f"f{index}", frame))
         except PlaywrightError:
             warnings.append(f"f{index}: frame unavailable")
         finally:

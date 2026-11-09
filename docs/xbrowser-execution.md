@@ -83,15 +83,23 @@ sensitive-action controls. Private targets are denied by default. See
 ## Agent behavior and evidence
 
 A successful action stays on the current plan objective. `STEP_DONE: <evidence>`
-explicitly advances it after successful action evidence exists. `DONE:` remains a
-model-declared final result; supplied trusted acceptance checks must pass before
-the run can complete. Repeated completion claims without action evidence fail after bounded
-nudges. A successful click or macro never independently verifies the user's goal.
+triggers deterministic evaluation of any objective checks. The planner may propose
+exact URL, hostname, or visible-text conditions. The run records the source of each
+check separately. For important steps, supply trusted milestones in the acceptance
+JSON as `"milestones": [{"objective": "Find the tutorial", "checks": [{"kind":
+"url_host", "expected": "docs.python.org"}]}]`. Trusted milestones define the ordered
+plan and survive replanning. Optional top-level `checks` still gate final `DONE:`.
+Unchecked steps retain model-reported completion with successful action evidence.
 
 Repeat signatures hash full canonical arguments and browser session/generation/
 tab/state. Changed-state scrolling is allowed; repeated direct evidence of no
 movement is independently bounded even if a dynamic page changes its fingerprint.
 State capture includes bounded nested-container scroll positions.
+Run history separates mechanical action success, relevant state change, and
+objective verification. Stale or obscured targets require fresh observation.
+An uncertain browser mutation locks the executor to inspection until the run
+passes trusted final checks or stops for human review. A partially executed macro
+cannot be replayed as the same sequence by changing its timeout.
 
 Older successful observation payloads are compacted to snapshot references.
 Errors, screenshots, and other action results stay in working memory subject to

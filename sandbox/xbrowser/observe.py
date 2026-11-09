@@ -48,12 +48,17 @@ async def observe(session, page, request):
             if info["value"] is not None:
                 flags += f" value={quoted(info['value'], 20)}"
             line = f"[{ref}] {reference.frame_id} {info['role'][:24]} {quoted(info['name'], 40)}{flags}"
+            if info["scrollable"]:
+                line += " scrollable"
+            if info["nearby_label"]:
+                line += " in " + quoted(info["nearby_label"], 32)
             if len(elements) >= request.max_elements or sum(len(item) + 1 for item in lines) + len(line) > request.max_chars - 240:
                 break
             lines.append(line)
             snapshot.refs[ref] = reference
             elements.append({"ref": ref, "frame_id": reference.frame_id,
-                             **{key: info[key] for key in ("role", "name", "type", "disabled", "checked", "value", "bbox")}})
+                             **{key: info[key] for key in ("role", "name", "type", "disabled", "checked", "value",
+                                                          "bbox", "nearby_label", "scrollable")}})
         if request.text:
             text = await page.locator("body").inner_text(timeout=5000)
             available = max(0, request.max_chars - sum(len(item) + 1 for item in lines) - 240)

@@ -33,6 +33,7 @@ class BrowserPolicy:
     allowed_domains: tuple[str, ...] = ()
     denied_domains: tuple[str, ...] = ()
     local_origins: tuple[str, ...] = ()  # Trusted, exact fixture/service exceptions; never supplied by the model.
+    review_interactions: bool = False
 
     @classmethod
     def from_env(cls):
@@ -44,11 +45,17 @@ class BrowserPolicy:
             if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
                 raise ValueError("XBROWSER_LOCAL_ORIGINS must contain exact HTTP(S) origins")
             host = parsed.hostname.lower()
+            if host != "localhost":
+                try:
+                    ipaddress.ip_address(host)
+                except ValueError as exc:
+                    raise ValueError("Local exceptions require localhost or a literal IP address") from exc
             origins.append(f"{parsed.scheme}://{'['+host+']' if ':' in host else host}:{parsed.port or (443 if parsed.scheme == 'https' else 80)}")
         return cls(
             allowed_actions=frozenset(values("XBROWSER_ALLOWED_ACTIONS")) if "XBROWSER_ALLOWED_ACTIONS" in os.environ else CORE_ACTIONS,
             allowed_domains=values("XBROWSER_ALLOWED_DOMAINS"), denied_domains=values("XBROWSER_DENIED_DOMAINS"),
             local_origins=tuple(origins),
+            review_interactions=os.environ.get("XBROWSER_REVIEW_INTERACTIONS") == "1",
         )
 
     def check(self, action: str):
@@ -56,13 +63,17 @@ class BrowserPolicy:
             raise BrowserError("ACTION_DENIED", f"Browser action disabled by sandbox policy: {action}")
 
     def destination(self, url: str) -> tuple[str, int, bool]:
-        parsed = urlsplit(url)
+        try:
+            parsed = urlsplit(url)
+            host = (parsed.hostname or "").rstrip(".").encode("idna").decode().lower()
+            port = parsed.port
+        except (ValueError, UnicodeError) as exc:
+            raise BrowserError("NAVIGATION_DENIED", "Malformed destination authority") from exc
         if parsed.scheme not in {"http", "https", "ws", "wss"} or not parsed.hostname or parsed.username or parsed.password:
             raise BrowserError("NAVIGATION_DENIED", "Only HTTP(S) destinations without embedded credentials are allowed")
-        host = parsed.hostname.rstrip(".").encode("idna").decode().lower()
-        if "%" in host:
+        if not host or "%" in host or port == 0:
             raise BrowserError("NAVIGATION_DENIED", "Scoped network addresses are forbidden")
-        port = parsed.port or (443 if parsed.scheme in {"https", "wss"} else 80)
+        port = port or (443 if parsed.scheme in {"https", "wss"} else 80)
         scheme = {"ws": "http", "wss": "https"}.get(parsed.scheme, parsed.scheme)
         origin = f"{scheme}://{'[' + host + ']' if ':' in host else host}:{port}"
         local = origin in self.local_origins
@@ -92,7 +103,9 @@ class BrowserPolicy:
         except (OSError, TimeoutError) as exc:
             raise BrowserError("NAVIGATION_DENIED", "Destination could not be resolved") from exc
         ips = list(dict.fromkeys(item[4][0] for item in addresses))
-        if not ips or (not local and any(not public_address(address) for address in ips)):
+        if not ips or (not local and any(not public_address(address) for address in ips)) or (
+            local and host == "localhost" and any(not ipaddress.ip_address(address).is_loopback for address in ips)
+        ):
             raise BrowserError("NAVIGATION_DENIED", "Private, loopback, reserved and metadata addresses are forbidden")
         # The proxy connects to this literal IP, never re-resolving the hostname.
         return ips, port

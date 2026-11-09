@@ -8,8 +8,11 @@ the tool server running inside the Docker container.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import Any, Literal
 
 import httpx
@@ -19,12 +22,17 @@ from local_agent.tools.base import ToolResult
 logger = logging.getLogger(__name__)
 
 
+class BrowserLeaseUnavailable(RuntimeError):
+    pass
+
+
 class SandboxClient:
     """HTTP client for the sandbox tool server."""
 
     def __init__(self, base_url: str = "http://localhost:9000", *, admin_token: str | None = None) -> None:
         self._base_url = base_url.rstrip("/")
         self._browser_approval_token = None
+        self._lease = ContextVar(f"browser_lease_{id(self)}", default="")
         self._admin_token = admin_token if admin_token is not None else os.environ.get("XALGV_SANDBOX_ADMIN_TOKEN")
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
@@ -75,6 +83,30 @@ class SandboxClient:
 
     # ── Browser automation ───────────────────────────────────────────────
 
+    @asynccontextmanager
+    async def browser_lease(self, owner: str, seconds: int):
+        if self._lease.get():
+            raise RuntimeError("Browser leases cannot be nested")
+        while True:
+            result = await self._post("/tools/browser/lease", {"action": "acquire", "owner": owner, "seconds": seconds})
+            if result.metadata.get("error_code") != "BROWSER_LEASE_BUSY":
+                break
+            await asyncio.sleep(0.1)
+        secret = result.metadata.get("data", {}).get("token")
+        if not result.success or not isinstance(secret, str) or not secret:
+            raise BrowserLeaseUnavailable(result.error or "Sandbox did not issue a browser lease")
+        context = self._lease.set(secret)
+        try:
+            yield
+        finally:
+            self._lease.reset(context)
+            release = asyncio.create_task(self._post("/tools/browser/lease", {"action": "release"},
+                                                     headers={"X-XBrowser-Lease": secret}))
+            # The server TTL fences stale callers if cleanup is interrupted.
+            released = await asyncio.shield(release)
+            if not released.success:
+                logger.warning("Browser lease release could not be confirmed; its deadline still applies")
+
     async def browser_verify(self, checks: list[dict[str, Any]]) -> ToolResult:
         """Trusted caller checks; deliberately absent from the model tool registry."""
         return await self._post("/tools/browser/verify", {"checks": checks})
@@ -82,9 +114,14 @@ class SandboxClient:
     async def browser_image(self, path: str) -> ToolResult:
         return await self._post("/tools/browser/image", {"path": path})
 
-    async def browser_authorize(self, tool: str, args: dict[str, Any], admin_token: str) -> ToolResult:
+    async def browser_authorize(
+        self, tool: str, args: dict[str, Any], admin_token: str, *, network_write: dict[str, Any] | None = None,
+    ) -> ToolResult:
         """Call only after human review; neither this method nor its secret is model-exposed."""
-        return await self._post("/tools/browser/authorize", {"tool": tool, "args": args},
+        payload = {"tool": tool, "args": args}
+        if network_write is not None:
+            payload["network_write"] = network_write
+        return await self._post("/tools/browser/authorize", payload,
                                 headers={"X-XBrowser-Admin": admin_token})
 
     def use_browser_approval(self, token: str):
@@ -170,6 +207,7 @@ class SandboxClient:
         text: str | None = None,
         role: str | None = None,
         *, ref: int | None = None, snapshot_id: str | None = None,
+        semantic_target: dict[str, Any] | None = None,
     ) -> ToolResult:
         """Click an element on the page."""
         payload: dict[str, Any] = {}
@@ -183,6 +221,8 @@ class SandboxClient:
             payload["ref"] = ref
         if snapshot_id is not None:
             payload["snapshot_id"] = snapshot_id
+        if semantic_target is not None:
+            payload["semantic_target"] = semantic_target
         return await self._post("/tools/browser/click", payload)
 
     async def browser_type(
@@ -192,6 +232,7 @@ class SandboxClient:
         clear_first: bool = True,
         press_enter: bool = False,
         *, ref: int | None = None, snapshot_id: str | None = None,
+        semantic_target: dict[str, Any] | None = None,
     ) -> ToolResult:
         """Type text into an input element."""
         payload: dict[str, Any] = {
@@ -205,6 +246,8 @@ class SandboxClient:
             payload["ref"] = ref
         if snapshot_id is not None:
             payload["snapshot_id"] = snapshot_id
+        if semantic_target is not None:
+            payload["semantic_target"] = semantic_target
         return await self._post("/tools/browser/type", payload)
 
     async def browser_screenshot(
@@ -236,13 +279,18 @@ class SandboxClient:
 
     async def _post(self, endpoint: str, payload: dict[str, Any], *, headers=None) -> ToolResult:
         """POST to the sandbox tool server and parse the response."""
+        browser_call = endpoint.startswith("/tools/browser/")
         try:
+            if browser_call and self._lease.get():
+                headers = {**(headers or {}), "X-XBrowser-Lease": self._lease.get()}
             if self._browser_approval_token and endpoint in {"/tools/browser/click", "/tools/browser/type", "/tools/browser/press"}:
                 headers = {**(headers or {}), "X-XBrowser-Approval": self._browser_approval_token}
                 self._browser_approval_token = None
             resp = await self._client.post(endpoint, json=payload, headers=headers)
             resp.raise_for_status()
             data = resp.json()
+            if not isinstance(data, dict):
+                raise TypeError("Expected an object from the sandbox")
             return ToolResult(
                 success=data.get("success", False),
                 output=data.get("output", ""),
@@ -257,15 +305,25 @@ class SandboxClient:
                 },
             )
         except httpx.TimeoutException:
-            return ToolResult(success=False, output="", error="Sandbox request timed out.")
+            metadata = {"error_code": "ACTION_TIMEOUT", "data": {"outcome_uncertain": True}} if browser_call else {}
+            return ToolResult(success=False, output="", error="Sandbox request timed out.", metadata=metadata)
         except httpx.HTTPStatusError as exc:
+            metadata = {"error_code": "BROWSER_CONNECTION_LOST", "data": {"outcome_uncertain": True}} if browser_call and exc.response.status_code >= 500 else {}
+            if browser_call and exc.response.status_code == 423:
+                metadata = {"error_code": "BROWSER_LEASE_BUSY"}
             return ToolResult(
                 success=False, output="",
                 error=f"Sandbox returned HTTP {exc.response.status_code}.",
+                metadata=metadata,
             )
         except httpx.HTTPError as exc:
+            metadata = {"error_code": "BROWSER_CONNECTION_LOST", "data": {"outcome_uncertain": True}} if browser_call else {}
             return ToolResult(
                 success=False, output="",
                 error=f"Cannot reach sandbox: {exc}",
+                metadata=metadata,
             )
+        except (TypeError, ValueError):
+            metadata = {"error_code": "BROWSER_CONNECTION_LOST", "data": {"outcome_uncertain": True}} if browser_call else {}
+            return ToolResult(success=False, output="", error="Invalid sandbox response.", metadata=metadata)
 

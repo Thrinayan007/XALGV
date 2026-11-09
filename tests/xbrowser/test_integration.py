@@ -31,6 +31,30 @@ async def client(browser, monkeypatch):
     await agent.close()
 
 
+async def test_browser_lease_fences_other_clients_and_stale_owners(client, site):
+    peer = SandboxClient("http://sandbox")
+    await peer.close()
+    peer._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=tool_server.app), base_url="http://sandbox")
+    try:
+        async with client.browser_lease("run_a/browser", 20):
+            stale_token = client._lease.get()
+            first = await client.browser_open(f"{site}/first.html")
+            assert first.success
+            blocked = await peer.browser_tabs("new", url=f"{site}/second.html")
+            assert blocked.metadata["error_code"] == "BROWSER_LEASE_BUSY"
+            blocked = await peer.browser_session("stop")
+            assert blocked.metadata["error_code"] == "BROWSER_LEASE_BUSY"
+            tabs = await client.browser_tabs("list")
+            assert tabs.success and tabs.metadata["tab_id"] == first.metadata["tab_id"]
+        async with peer.browser_lease("run_b/browser", 20):
+            stale = await client._post("/tools/browser/tabs", {"action": "list"}, headers={"X-XBrowser-Lease": stale_token})
+            assert stale.metadata["error_code"] == "BROWSER_LEASE_BUSY"
+            assert (await peer.browser_tabs("new", url=f"{site}/second.html")).success
+        assert (await client.browser_tabs("list")).success
+    finally:
+        await peer.close()
+
+
 async def test_foundation_end_to_end(client, site):
     started = await client.browser_session("start")
     assert started.success

@@ -5,6 +5,8 @@ interception, credential logging, or ambient environment proxy configuration.
 """
 
 import asyncio
+import re
+import socket
 from contextlib import suppress
 from urllib.parse import urlsplit
 
@@ -18,9 +20,13 @@ class EgressProxy:
         self._server = None
         self._tasks = set()
 
+    @property
+    def url(self):
+        return f"http://127.0.0.1:{self._server.sockets[0].getsockname()[1]}"
+
     async def start(self):
         self._server = await asyncio.start_server(self._accept, "127.0.0.1", 0, limit=65536)
-        return f"http://127.0.0.1:{self._server.sockets[0].getsockname()[1]}"
+        return self.url
 
     async def stop(self):
         if self._server:
@@ -49,11 +55,17 @@ class EgressProxy:
                 method, target, version = lines[0].split(" ", 2)
                 if version not in {"HTTP/1.0", "HTTP/1.1"}:
                     raise BrowserError("NAVIGATION_DENIED", "Unsupported proxy protocol")
+                if method == "CONNECT" and not re.fullmatch(r"(?:\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.-]+):[0-9]+", target):
+                    raise BrowserError("NAVIGATION_DENIED", "Invalid CONNECT authority")
+                if method != "CONNECT" and urlsplit(target).scheme != "http":
+                    raise BrowserError("NAVIGATION_DENIED", "Plain proxy requests require an absolute HTTP URL")
+                if any(line.lower().startswith("upgrade:") for line in lines[1:]):
+                    raise BrowserError("NAVIGATION_DENIED", "Protocol upgrades are disabled")
                 url = f"https://{target}/" if method == "CONNECT" else target
                 ips, port = await self.policy.resolve_addresses(url)
                 for ip in ips:
                     try:
-                        source, upstream = await asyncio.open_connection(ip, port)
+                        source, upstream = await asyncio.open_connection(ip, port, flags=socket.AI_NUMERICHOST)
                         break
                     except OSError:
                         if ip == ips[-1]:
@@ -94,7 +106,7 @@ class EgressProxy:
                 await asyncio.gather(first, second, return_exceptions=True)
         except (BrowserError, OSError, ValueError, TimeoutError, asyncio.IncompleteReadError, asyncio.LimitOverrunError) as exc:
             if isinstance(exc, BrowserError):
-                self.events.append({"type": "navigation_denied", "code": exc.code})
+                self.events.append({"type": "navigation_denied", "code": exc.code, "reason": str(exc)})
             if not connected:
                 with suppress(OSError):
                     writer.write(b"HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n")
