@@ -1,0 +1,11 @@
+# Full checkout install. Host dependencies and extras are maintained in pyproject.toml.
+-e .[dev,sandbox,rag]
+
+# Include Python packages used by the Docker tool server for local testing.
+-r sandbox/tool_server_requirements.txt
+
+# Document ingestion and Office format support.
+docling>=2.0.0
+PyPDF2>=3.0.0
+openpyxl>=3.1.0
+python-pptx>=1.0.0

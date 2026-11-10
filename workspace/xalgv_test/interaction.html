@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>XALGV Interaction Test</title>
+    <style>
+        body {
+            background: #101827;
+            color: white;
+            font-family: Arial;
+            text-align: center;
+            padding: 100px;
+        }
+        input, button {
+            padding: 12px;
+            margin: 10px;
+        }
+        button {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>XALGV Browser Interaction Test</h1>
+
+    <input id="name" placeholder="Enter your name">
+
+    <button id="submit" onclick="
+        document.getElementById('result').textContent =
+        'Hello, ' + document.getElementById('name').value;
+    ">Submit</button>
+
+    <h2 id="result">Not submitted</h2>
+</body>
+</html>

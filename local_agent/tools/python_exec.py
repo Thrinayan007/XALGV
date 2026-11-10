@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from local_agent.security.permissions import PermissionTier
@@ -28,7 +29,7 @@ class PythonExecTool(Tool):
 
     @property
     def permission_tier(self) -> PermissionTier:
-        return PermissionTier.WORKSPACE_WRITE
+        return PermissionTier.SYSTEM
 
     @property
     def parameters_schema(self) -> dict[str, Any]:
@@ -59,14 +60,13 @@ class PythonExecTool(Tool):
             return ToolResult(success=False, output="", error="Sandbox not configured.")
 
         # Write code to a temp file and execute it.
-        write_result = await self._sandbox.write_file(
-            "/tmp/_agent_script.py", code
-        )
+        script_path = f"/workspace/.agent_scripts/{uuid.uuid4().hex}.py"
+        write_result = await self._sandbox.write_file(script_path, code)
         if not write_result.success:
             return ToolResult(success=False, output="", error=f"Failed to write script: {write_result.error}")
 
         return await self._sandbox.execute_shell(
-            command="python3 /tmp/_agent_script.py",
+            command=f"python3 {script_path}",
             working_dir="/workspace",
             timeout=timeout,
         )

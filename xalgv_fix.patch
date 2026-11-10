@@ -1,0 +1,276 @@
+diff --git a/local_agent/__pycache__/config.cpython-312.pyc b/local_agent/__pycache__/config.cpython-312.pyc
+index ad56d6b..2fdb8d7 100644
+Binary files a/local_agent/__pycache__/config.cpython-312.pyc and b/local_agent/__pycache__/config.cpython-312.pyc differ
+diff --git a/local_agent/__pycache__/models.cpython-312.pyc b/local_agent/__pycache__/models.cpython-312.pyc
+index 883ecca..f788402 100644
+Binary files a/local_agent/__pycache__/models.cpython-312.pyc and b/local_agent/__pycache__/models.cpython-312.pyc differ
+diff --git a/local_agent/core/__pycache__/loop.cpython-312.pyc b/local_agent/core/__pycache__/loop.cpython-312.pyc
+index 3795a65..cdd064e 100644
+Binary files a/local_agent/core/__pycache__/loop.cpython-312.pyc and b/local_agent/core/__pycache__/loop.cpython-312.pyc differ
+diff --git a/local_agent/core/loop.py b/local_agent/core/loop.py
+index 0f561f2..a58a5fd 100644
+--- a/local_agent/core/loop.py
++++ b/local_agent/core/loop.py
+@@ -97,10 +97,25 @@ class AgentLoop:
+         )
+         budget.start()
+ 
++        exec_cfg = self._config.model_roles.get("executor", self._config.model_roles["planner"])
++        tool_defs = self._tools.get_tool_definitions()
++        # Tool schemas, the system prompt and the generation reserve all share num_ctx with
++        # the conversation, so only the remainder is available to working memory.
++        tool_tokens = len(json.dumps(tool_defs)) // 3
++        history_budget = exec_cfg.context_length - tool_tokens - 700 - 1024
++        if history_budget < 1000:
++            logger.warning(
++                "Context is tight: num_ctx=%d, tool schemas ~%d tokens. Only ~%d tokens remain for "
++                "conversation + output. Raise context_length (8192+ recommended) or expose fewer tools.",
++                exec_cfg.context_length, tool_tokens, max(history_budget, 0),
++            )
+         working = WorkingMemory(
+-            max_tokens=self._config.model_roles.get("executor", self._config.model_roles["planner"]).context_length,
++            max_tokens=max(history_budget, 768),
+             system_prompt="",  # Will be set dynamically each turn.
+         )
++        max_nudges = getattr(self._config, "max_nudges", 3)
++        consecutive_nudges = 0
++        announce_task = True
+ 
+         try:
+             # ── Phase 1: Planning ────────────────────────────────────────
+@@ -152,12 +167,13 @@ class AgentLoop:
+                 working.set_plan(state.plan)
+                 working.set_scratchpad(state.scratchpad)
+ 
+-                # Add current task instruction.
+-                current_task = state.current_plan_step or "Continue working on the goal."
+-                working.add_message("user", f"Execute this step: {current_task}")
++                # Add current task instruction (not again right after a nudge).
++                if announce_task:
++                    current_task = state.current_plan_step or "Continue working on the goal."
++                    working.add_message("user", f"Execute this step: {current_task}")
++                announce_task = True
+ 
+                 # Get model decision.
+-                tool_defs = self._tools.get_tool_definitions()
+                 response = await self._model.chat(
+                     "executor",
+                     working.get_messages(),
+@@ -168,6 +184,7 @@ class AgentLoop:
+ 
+                 # ── Handle tool calls ────────────────────────────────────
+                 if response.has_tool_calls:
++                    consecutive_nudges = 0
+                     tc = response.tool_calls[0]  # One tool per turn.
+                     action_key = f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True)[:100]}"
+ 
+@@ -272,14 +289,33 @@ class AgentLoop:
+                         state.status = RunStatus.AWAITING_HUMAN
+                         state.last_error = content[8:].strip()
+                     else:
+-                        # Model responded without calling a tool — nudge it.
+-                        working.add_message("assistant", content)
++                        # Model responded without calling a tool: nudge it, but give up
++                        # quickly if it keeps doing so instead of burning the step budget.
++                        consecutive_nudges += 1
++                        logger.warning(
++                            "No tool call from model (%d/%d): content=%d chars, thinking=%d chars, "
++                            "done_reason=%s",
++                            consecutive_nudges, max_nudges, len(content),
++                            len(response.thinking or ""), response.done_reason or "?",
++                        )
++                        if consecutive_nudges >= max_nudges:
++                            state.status = RunStatus.FAILED
++                            state.last_error = (
++                                f"Model returned {consecutive_nudges} consecutive responses without a "
++                                f"tool call (last: content={len(content)} chars, "
++                                f"thinking={len(response.thinking or '')} chars, "
++                                f"done_reason={response.done_reason or '?'}). Likely causes: context "
++                                "window too small for the tool schemas, thinking consuming the output "
++                                "budget, or the model's tool-call format not being parsed."
++                            )
++                            break
++                        working.add_message("assistant", content or "(empty response)")
+                         working.add_message(
+                             "user",
+                             "You must call a tool to make progress.  "
+                             "Use one of the available tools, or respond with DONE: or BLOCKED: if finished.",
+                         )
+-                        budget.record_step("nudge")
++                        announce_task = False
+                         continue
+ 
+                 # Checkpoint after each step.
+diff --git a/local_agent/memory/__pycache__/working.cpython-312.pyc b/local_agent/memory/__pycache__/working.cpython-312.pyc
+index 153bab6..4d3f170 100644
+Binary files a/local_agent/memory/__pycache__/working.cpython-312.pyc and b/local_agent/memory/__pycache__/working.cpython-312.pyc differ
+diff --git a/local_agent/models.py b/local_agent/models.py
+index 22a4b4e..ca047b1 100644
+--- a/local_agent/models.py
++++ b/local_agent/models.py
+@@ -42,6 +42,7 @@ class ChatResponse:
+     role: str
+     done: bool
+     thinking: str = ""
++    done_reason: str = ""
+     total_duration_ns: int = 0
+     eval_count: int = 0
+     prompt_eval_count: int = 0
+@@ -80,6 +81,7 @@ class ModelManager:
+         )
+         self._current_model: str | None = None
+         self._lock = asyncio.Lock()
++        self._no_think: set[str] = set()  # models that reject the `think` option
+ 
+     # ── Public API ───────────────────────────────────────────────────────
+ 
+@@ -109,8 +111,17 @@ class ModelManager:
+             payload["options"]["num_predict"] = max_tokens
+         if tools:
+             payload["tools"] = tools
++        # Control thinking explicitly (executor: off, planner: on). Models that do not
++        # support the option are remembered and retried without it.
++        if role_cfg.model not in self._no_think:
++            payload["think"] = role_cfg.thinking
+ 
+         resp = await self._client.post("/api/chat", json=payload)
++        if resp.status_code == 400 and "think" in payload and "think" in resp.text.lower():
++            logger.info("Model %s does not support 'think'; retrying without it.", role_cfg.model)
++            self._no_think.add(role_cfg.model)
++            payload.pop("think")
++            resp = await self._client.post("/api/chat", json=payload)
+         resp.raise_for_status()
+         data = resp.json()
+ 
+@@ -125,13 +136,34 @@ class ModelManager:
+                 arguments=fn.get("arguments", {}),
+             ))
+ 
++        prompt_tokens = data.get("prompt_eval_count", 0) or 0
++        gen_tokens = data.get("eval_count", 0) or 0
++        done_reason = data.get("done_reason", "") or ""
++        content_text = msg.get("content", "") or ""
++        thinking_text = msg.get("thinking", "") or ""
++        logger.info(
++            "chat[%s] %s: prompt=%d/%d tok, generated=%d tok, done_reason=%s, "
++            "content=%d chars, thinking=%d chars, tool_calls=%d",
++            role, role_cfg.model, prompt_tokens, role_cfg.context_length, gen_tokens,
++            done_reason or "?", len(content_text), len(thinking_text), len(tool_calls),
++        )
++        if prompt_tokens >= 0.9 * role_cfg.context_length:
++            logger.warning(
++                "Prompt used %d of %d context tokens (role=%s). Ollama silently truncates input "
++                "beyond num_ctx, which breaks tool calling. Raise context_length or shrink the "
++                "prompt/tools.", prompt_tokens, role_cfg.context_length, role,
++            )
++        if done_reason == "length":
++            logger.warning("Generation for role=%s stopped at the token/context limit.", role)
++
+         return ChatResponse(
+-            content=msg.get("content", ""),
++            content=content_text,
+             tool_calls=tool_calls,
+             model=data.get("model", role_cfg.model),
+             role=msg.get("role", "assistant"),
+             done=data.get("done", True),
+-            thinking=msg.get("thinking", ""),
++            thinking=thinking_text,
++                done_reason=done_reason,
+             total_duration_ns=data.get("total_duration", 0),
+             eval_count=data.get("eval_count", 0),
+             prompt_eval_count=data.get("prompt_eval_count", 0),
+diff --git a/local_agent/sandbox/client.py b/local_agent/sandbox/client.py
+index 5c13013..d747464 100644
+--- a/local_agent/sandbox/client.py
++++ b/local_agent/sandbox/client.py
+@@ -52,11 +52,12 @@ class SandboxClient:
+             "max_lines": max_lines,
+         })
+ 
+-    async def write_file(self, path: str, content: str) -> ToolResult:
+-        """Write a file in the sandbox."""
++    async def write_file(self, path: str, content: str, append: bool = False) -> ToolResult:
++        """Write (or append to) a file in the sandbox."""
+         return await self._post("/tools/write_file", {
+             "path": path,
+             "content": content,
++            "append": append,
+         })
+ 
+     async def list_files(self, path: str = "/workspace") -> ToolResult:
+diff --git a/local_agent/tools/__pycache__/file_ops.cpython-312.pyc b/local_agent/tools/__pycache__/file_ops.cpython-312.pyc
+index f960da3..9e30d3d 100644
+Binary files a/local_agent/tools/__pycache__/file_ops.cpython-312.pyc and b/local_agent/tools/__pycache__/file_ops.cpython-312.pyc differ
+diff --git a/local_agent/tools/file_ops.py b/local_agent/tools/file_ops.py
+index f857457..cfe2a2d 100644
+--- a/local_agent/tools/file_ops.py
++++ b/local_agent/tools/file_ops.py
+@@ -76,7 +76,11 @@ class WriteFileTool(Tool):
+ 
+     @property
+     def description(self) -> str:
+-        return "Write content to a file.  Creates parent directories if needed.  Overwrites existing files."
++        return (
++            "Write content to a file.  Creates parent directories if needed.  Overwrites existing files "
++            "unless append=true.  For large files, write the first part, then add the rest in several "
++            "calls with append=true."
++        )
+ 
+     @property
+     def permission_tier(self) -> PermissionTier:
+@@ -93,7 +97,12 @@ class WriteFileTool(Tool):
+                 },
+                 "content": {
+                     "type": "string",
+-                    "description": "The full text content to write.",
++                    "description": "The text content to write.",
++                },
++                "append": {
++                    "type": "boolean",
++                    "description": "Append to the file instead of overwriting (default: false).",
++                    "default": False,
+                 },
+             },
+             "required": ["path", "content"],
+@@ -103,7 +112,9 @@ class WriteFileTool(Tool):
+     async def execute(self, params: dict[str, Any]) -> ToolResult:
+         if self._sandbox is None:
+             return ToolResult(success=False, output="", error="Sandbox not configured.")
+-        return await self._sandbox.write_file(params["path"], params["content"])
++        return await self._sandbox.write_file(
++            params["path"], params["content"], append=bool(params.get("append", False))
++        )
+ 
+     async def verify(self, params: dict[str, Any], result: ToolResult) -> VerificationResult:
+         # Verify by reading back and checking the file exists.
+diff --git a/sandbox/tool_server.py b/sandbox/tool_server.py
+index 0e9af8a..df6d103 100644
+--- a/sandbox/tool_server.py
++++ b/sandbox/tool_server.py
+@@ -54,6 +54,7 @@ class ReadFileRequest(BaseModel):
+ class WriteFileRequest(BaseModel):
+     path: str
+     content: str
++    append: bool = False
+ 
+ 
+ class ListFilesRequest(BaseModel):
+@@ -133,8 +134,16 @@ async def write_file(req: WriteFileRequest) -> ToolResponse:
+         path = WORKSPACE / path
+     try:
+         path.parent.mkdir(parents=True, exist_ok=True)
+-        path.write_text(req.content, encoding="utf-8")
+-        return ToolResponse(success=True, output=f"Wrote {len(req.content)} bytes to {path}")
++        if req.append:
++            with path.open("a", encoding="utf-8") as fh:
++                fh.write(req.content)
++        else:
++            path.write_text(req.content, encoding="utf-8")
++        verb = "Appended" if req.append else "Wrote"
++        return ToolResponse(
++            success=True,
++            output=f"{verb} {len(req.content)} chars to {path} (file size now {path.stat().st_size} bytes)",
++        )
+     except Exception as exc:
+         return ToolResponse(success=False, output="", error=f"Write error: {exc}")
+ 

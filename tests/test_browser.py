@@ -7,23 +7,24 @@ from local_agent.tools.browser import (
     BrowserClickTool,
     BrowserGetContentTool,
     BrowserNavigateTool,
+    BrowserObserveTool,
     BrowserScreenshotTool,
     BrowserTypeTool,
 )
-
 
 # ── Schema and metadata tests (sync, no sandbox needed) ─────────────────
 
 class TestBrowserToolSchemas:
     """Verify all browser tools have correct schemas and metadata."""
 
-    TOOLS = [
+    TOOLS = (
         ("browser_navigate", BrowserNavigateTool),
+        ("browser_observe", BrowserObserveTool),
         ("browser_get_content", BrowserGetContentTool),
         ("browser_click", BrowserClickTool),
         ("browser_type", BrowserTypeTool),
         ("browser_screenshot", BrowserScreenshotTool),
-    ]
+    )
 
     @pytest.mark.parametrize("expected_name,tool_cls", TOOLS)
     def test_tool_name(self, expected_name, tool_cls):
@@ -55,12 +56,13 @@ class TestBrowserToolSchemas:
         assert "url" in schema["properties"]
         assert "url" in schema["required"]
 
-    def test_type_requires_selector_and_text(self):
+    def test_type_requires_text_and_a_target(self):
         tool = BrowserTypeTool()
         schema = tool.parameters_schema
         assert "selector" in schema["properties"]
         assert "text" in schema["properties"]
-        assert "selector" in schema["required"]
+        assert {"required": ["selector"]} in schema["anyOf"]
+        assert {"required": ["ref", "snapshot_id"]} in schema["anyOf"]
         assert "text" in schema["required"]
 
     def test_get_content_has_mode_enum(self):

@@ -16,6 +16,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    "markdown-it-py>=3,<5",
 ]
 
 [project.optional-dependencies]
@@ -23,9 +24,12 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "ruff>=0.8",
+    "psutil>=6",
 ]
 sandbox = [
     "playwright>=1.49",
+    "Pillow>=10.0",
+    "tokenizers>=0.21",
 ]
 rag = [
     "lancedb>=0.14",
@@ -34,8 +38,12 @@ rag = [
 [project.scripts]
 xalgv = "local_agent.main:cli_main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["local_agent", "eval"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
 [tool.ruff]

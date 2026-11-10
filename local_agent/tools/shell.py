@@ -28,7 +28,7 @@ class ShellExecTool(Tool):
 
     @property
     def permission_tier(self) -> PermissionTier:
-        return PermissionTier.WORKSPACE_WRITE
+        return PermissionTier.SYSTEM
 
     @property
     def parameters_schema(self) -> dict[str, Any]:
@@ -78,7 +78,7 @@ class ShellExecTool(Tool):
         if result.exit_code == 0:
             return VerificationResult(
                 status=VerificationStatus.PASSED,
-                message=f"Command exited with code 0.",
+                message="Command exited with code 0.",
                 evidence={"exit_code": result.exit_code},
             )
         return VerificationResult(

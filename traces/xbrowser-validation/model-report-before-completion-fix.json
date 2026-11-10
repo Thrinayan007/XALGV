@@ -1,0 +1,116 @@
+{
+  "model": "qwen3.5:9b",
+  "repeats": 3,
+  "mode": "real-model-real-chromium-local-fixtures",
+  "context_length": 8192,
+  "results": [
+    {
+      "trial": "navigation-0-f472d61d",
+      "scenario": "navigation",
+      "passed": false,
+      "run_status": "failed",
+      "summary": "Model returned 3 consecutive responses without a tool call (last: content=620 chars, thinking=0 chars, done_reason=stop). Likely causes: context window too small for the tool schemas, thinking consuming the output budget, or the model's tool-call format not being parsed.",
+      "seconds": 153.6676606000401,
+      "model_calls": 7,
+      "prompt_tokens": 15348,
+      "generated_tokens": 965,
+      "tools": [
+        "browser_open",
+        "browser_wait",
+        "browser_observe"
+      ],
+      "calls": [
+        {
+          "role": "planner",
+          "seconds": 41.106484200048726,
+          "prompt_tokens": 354,
+          "generated_tokens": 161,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 7.920159599976614,
+          "prompt_tokens": 2030,
+          "generated_tokens": 44,
+          "tools": [
+            "browser_open"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.532833100005519,
+          "prompt_tokens": 2138,
+          "generated_tokens": 71,
+          "tools": [
+            "browser_wait"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 9.422315199975856,
+          "prompt_tokens": 2291,
+          "generated_tokens": 70,
+          "tools": [
+            "browser_observe"
+          ]
+        },
+        {
+          "role": "executor",
+          "seconds": 29.698899000009988,
+          "prompt_tokens": 2573,
+          "generated_tokens": 225,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 28.805779699992854,
+          "prompt_tokens": 2848,
+          "generated_tokens": 217,
+          "tools": []
+        },
+        {
+          "role": "executor",
+          "seconds": 23.853659100015648,
+          "prompt_tokens": 3114,
+          "generated_tokens": 177,
+          "tools": []
+        }
+      ],
+      "acceptance": {
+        "error_code": null,
+        "action": "verify",
+        "session_id": "55f411f42f48421596aed611476201f3",
+        "generation": 1,
+        "tab_id": "t1",
+        "restarted": false,
+        "snapshot_id": null,
+        "state_before": null,
+        "state_after": null,
+        "state_changed": false,
+        "data": {
+          "checks": [
+            {
+              "check": {
+                "kind": "url",
+                "expected": "http://127.0.0.1:59898/profile.html"
+              },
+              "passed": true,
+              "error": null
+            },
+            {
+              "check": {
+                "kind": "text",
+                "expected": "Evaluation profile"
+              },
+              "passed": true,
+              "error": null
+            }
+          ]
+        },
+        "action_verification": {},
+        "task_verification": "passed"
+      }
+    }
+  ],
+  "status": "running"
+}

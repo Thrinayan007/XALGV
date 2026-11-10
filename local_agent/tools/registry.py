@@ -53,6 +53,10 @@ class ToolRegistry:
         """Return OpenAI-style tool definitions for tools the agent may see."""
         return [t.to_openai_tool() for t in self.list_tools(max_tier=max_tier)]
 
+    def available_tools(self) -> list[Tool]:
+        """Tools executable under the current policy without an additional grant."""
+        return [tool for tool in self._tools.values() if self._policy.is_allowed(tool.permission_tier)]
+
     @property
     def names(self) -> list[str]:
         return list(self._tools)
