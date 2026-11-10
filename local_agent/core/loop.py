@@ -423,23 +423,6 @@ class AgentLoop:
                     content = terminal_response(content)
                     if content.upper().startswith("DONE:"):
                         accepted = True
-                        if state.current_step < len(state.plan):
-                            premature_done_nudges += 1
-                            remaining = len(state.plan) - state.current_step
-                            state.last_error = f"Model claimed DONE with {remaining} planned objective(s) remaining."
-                            working.add_message("assistant", content)
-                            working.add_message(
-                                "user",
-                                f"Your plan is incomplete: {remaining} objective(s) remain. Finish each remaining "
-                                "objective and mark it with STEP_DONE after successful action evidence. Do not claim "
-                                "DONE until the plan is complete. If you cannot continue, respond BLOCKED with the reason.",
-                            )
-                            announce_task = False
-                            if premature_done_nudges >= max_nudges:
-                                state.status = RunStatus.FAILED
-                                state.last_error = "Model repeatedly claimed DONE before completing its planned objectives."
-                            continue
-
                         if recovery.uncertain_mutation and not checks:
                             state.status = RunStatus.AWAITING_HUMAN
                             state.last_error = "A browser mutation may have completed. Trusted outcome checks or human review are required."
