@@ -21,12 +21,15 @@ from pydantic import BaseModel
 
 app = FastAPI(title="XALGV Sandbox Tool Server", version="0.1.0")
 
-# ── Register browser automation routes ───────────────────────────────────
+# ── Register browser and office automation routes ─────────────────────────
 if __package__:
     from .browser_server import router as browser_router
+    from .office_server import router as office_router
 else:
     from browser_server import router as browser_router
+    from office_server import router as office_router
 app.include_router(browser_router)
+app.include_router(office_router)
 
 WORKSPACE = Path("/workspace")
 

@@ -38,6 +38,7 @@ async def cmd_run(args: argparse.Namespace) -> int:
     from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
     from local_agent.tools.image_question import ImageQuestionTool
+    from local_agent.tools.office import office_tools
     from local_agent.tools.python_exec import PythonExecTool
     from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
@@ -89,6 +90,8 @@ async def cmd_run(args: argparse.Namespace) -> int:
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),
+        # Phase 3 — Office automation.
+        *office_tools(sandbox),
     )
 
     loop = AgentLoop(config, model_mgr, registry, memory, task_verifier=TaskVerifier(sandbox))
@@ -132,6 +135,7 @@ async def cmd_eval(args: argparse.Namespace) -> int:
     from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
     from local_agent.tools.image_question import ImageQuestionTool
+    from local_agent.tools.office import office_tools
     from local_agent.tools.python_exec import PythonExecTool
     from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
@@ -178,6 +182,8 @@ async def cmd_eval(args: argparse.Namespace) -> int:
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),
+        # Phase 3 — Office automation.
+        *office_tools(sandbox),
     )
 
     agent_loop = AgentLoop(config, model_mgr, registry, memory, task_verifier=TaskVerifier(sandbox))

@@ -38,6 +38,12 @@ do not scroll first unless the user requested another position. To describe what
 is visible, use browser_screenshot with describe=true or browser_observe with text=true.
 Do not plan Python/OCR or installation for normal page descriptions.
 
+Office deliverables:
+- Use office_create_document to create formatted Word (.docx) documents with headings, text, and tables.
+- Use office_create_spreadsheet to create Excel (.xlsx) spreadsheets with sheets, data, and formulas.
+- Use office_convert_to_pdf to export documents to PDF via LibreOffice.
+- Use office_inspect to verify generated documents, sheets, and word counts.
+
 Respond with ONLY a JSON object:
 {
   "plan": [{"objective": "Find the tutorial", "success_conditions": {"url_host": "docs.python.org", "page_text_contains": "Python Tutorial"}, "max_retries": 3}],

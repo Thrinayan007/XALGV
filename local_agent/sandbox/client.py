@@ -81,6 +81,54 @@ class SandboxClient:
         """Take a screenshot of the sandbox desktop."""
         return await self._post("/tools/screenshot", {})
 
+    # ── Office automation (Phase 3) ──────────────────────────────────────
+
+    async def office_create_document(
+        self,
+        path: str,
+        title: str,
+        subtitle: str | None = None,
+        author: str | None = None,
+        sections: list[dict[str, Any]] | None = None,
+        include_page_numbers: bool = True,
+    ) -> ToolResult:
+        """Create a formatted Word document (.docx) in the sandbox."""
+        payload: dict[str, Any] = {
+            "path": path,
+            "title": title,
+            "subtitle": subtitle,
+            "author": author,
+            "sections": sections or [],
+            "include_page_numbers": include_page_numbers,
+        }
+        return await self._post("/tools/office/create_document", payload)
+
+    async def office_create_spreadsheet(
+        self,
+        path: str,
+        sheets: list[dict[str, Any]],
+    ) -> ToolResult:
+        """Create an Excel spreadsheet (.xlsx) in the sandbox."""
+        return await self._post("/tools/office/create_spreadsheet", {
+            "path": path,
+            "sheets": sheets,
+        })
+
+    async def office_convert_to_pdf(
+        self,
+        source_path: str,
+        output_dir: str = "/workspace",
+    ) -> ToolResult:
+        """Convert a document to PDF via LibreOffice in the sandbox."""
+        return await self._post("/tools/office/convert_to_pdf", {
+            "source_path": source_path,
+            "output_dir": output_dir,
+        })
+
+    async def office_inspect(self, path: str) -> ToolResult:
+        """Inspect the structure and contents of an office file in the sandbox."""
+        return await self._post("/tools/office/inspect", {"path": path})
+
     # ── Browser automation ───────────────────────────────────────────────
 
     @asynccontextmanager
