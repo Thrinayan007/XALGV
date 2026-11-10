@@ -129,6 +129,72 @@ class SandboxClient:
         """Inspect the structure and contents of an office file in the sandbox."""
         return await self._post("/tools/office/inspect", {"path": path})
 
+    # ── Desktop GUI automation (Phase 3) ─────────────────────────────────
+
+    async def gui_click(
+        self,
+        x: int,
+        y: int,
+        button: int = 1,
+        double: bool = False,
+        capture_after: bool = True,
+    ) -> ToolResult:
+        """Click screen coordinates on the virtual desktop."""
+        return await self._post("/tools/gui/click", {
+            "x": x,
+            "y": y,
+            "button": button,
+            "double": double,
+            "capture_after": capture_after,
+        })
+
+    async def gui_type(
+        self,
+        text: str,
+        delay_ms: int = 12,
+        capture_after: bool = True,
+    ) -> ToolResult:
+        """Type text into the active window on the virtual desktop."""
+        return await self._post("/tools/gui/type", {
+            "text": text,
+            "delay_ms": delay_ms,
+            "capture_after": capture_after,
+        })
+
+    async def gui_hotkey(
+        self,
+        keys: str,
+        capture_after: bool = True,
+    ) -> ToolResult:
+        """Execute a keyboard shortcut on the virtual desktop."""
+        return await self._post("/tools/gui/hotkey", {
+            "keys": keys,
+            "capture_after": capture_after,
+        })
+
+    async def gui_screenshot(self, path: str | None = None) -> ToolResult:
+        """Capture a screenshot of the virtual desktop."""
+        return await self._post("/tools/gui/screenshot", {"path": path})
+
+    async def gui_list_windows(self, all_desktops: bool = True) -> ToolResult:
+        """List open application windows on the virtual desktop."""
+        return await self._post("/tools/gui/list_windows", {"all_desktops": all_desktops})
+
+    async def gui_launch_app(
+        self,
+        app: str,
+        args: list[str] | None = None,
+        capture_after: bool = True,
+        wait_seconds: float = 1.0,
+    ) -> ToolResult:
+        """Launch an authorized GUI application on the virtual desktop."""
+        return await self._post("/tools/gui/launch_app", {
+            "app": app,
+            "args": args or [],
+            "capture_after": capture_after,
+            "wait_seconds": wait_seconds,
+        })
+
     # ── Browser automation ───────────────────────────────────────────────
 
     @asynccontextmanager

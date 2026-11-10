@@ -374,3 +374,4 @@ def office_tools(sandbox_client: Any = None) -> list[Tool]:
         OfficeConvertToPdfTool(sandbox_client),
         OfficeInspectTool(sandbox_client),
     ]
+

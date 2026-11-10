@@ -43,6 +43,8 @@ RUN mkdir -p /ms-playwright \
 COPY tool_server.py /opt/tool_server/tool_server.py
 COPY healthcheck.py /opt/tool_server/healthcheck.py
 COPY browser_server.py /opt/tool_server/browser_server.py
+COPY office_server.py /opt/tool_server/office_server.py
+COPY gui_server.py /opt/tool_server/gui_server.py
 COPY xbrowser /opt/tool_server/xbrowser
 RUN python3 -c "import hashlib,json,pathlib,urllib.request; config=json.loads(pathlib.Path('/opt/tool_server/xbrowser/tokenizer_config.json').read_text()); data=urllib.request.urlopen(config['url'],timeout=120).read(); assert hashlib.sha256(data).hexdigest()==config['sha256'], 'Tokenizer checksum mismatch'; pathlib.Path('/opt/tool_server/xbrowser-tokenizer.json').write_bytes(data)"
 ENV XBROWSER_TOKENIZER_PATH=/opt/tool_server/xbrowser-tokenizer.json

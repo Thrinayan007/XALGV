@@ -44,6 +44,14 @@ Office deliverables:
 - Use office_convert_to_pdf to export documents to PDF via LibreOffice.
 - Use office_inspect to verify generated documents, sheets, and word counts.
 
+Desktop GUI automation:
+- Use gui_launch_app to launch desktop applications (e.g. 'terminal', 'xterm', 'feh', 'libreoffice').
+- Use gui_list_windows to find open window titles, IDs, and positions on the virtual desktop.
+- Use gui_click to click buttons or interface coordinates (0-1280, 0-720).
+- Use gui_type to enter text into the active window.
+- Use gui_hotkey to trigger keyboard shortcuts (e.g. 'Return', 'ctrl+c', 'Alt+F4').
+- Use gui_screenshot to observe the full virtual desktop.
+
 Respond with ONLY a JSON object:
 {
   "plan": [{"objective": "Find the tutorial", "success_conditions": {"url_host": "docs.python.org", "page_text_contains": "Python Tutorial"}, "max_retries": 3}],

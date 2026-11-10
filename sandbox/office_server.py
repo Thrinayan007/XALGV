@@ -450,3 +450,4 @@ async def inspect_document(req: InspectRequest) -> OfficeResponse:
     except Exception as exc:
         logger.exception("Failed to inspect file")
         return OfficeResponse(success=False, error=f"File inspection error: {exc}")
+
