@@ -499,3 +499,4 @@ def gui_tools(sandbox_client: Any = None) -> list[Tool]:
         GuiListWindowsTool(sandbox_client),
         GuiLaunchAppTool(sandbox_client),
     ]
+

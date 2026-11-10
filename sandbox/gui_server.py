@@ -553,3 +553,4 @@ async def gui_launch_app(req: GuiLaunchAppRequest) -> GuiResponse:
     except Exception as exc:
         logger.exception("Error launching GUI app '%s'", req.app)
         return GuiResponse(success=False, output="", error=f"App launch error: {exc}")
+

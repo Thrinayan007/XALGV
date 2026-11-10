@@ -668,3 +668,4 @@ class TestGuiEvaluationMatrix:
         steps = [r1, r2, r3, r4, r5, r6]
         assert all(step.success for step in steps)
         assert len([step for step in steps if step.artifacts]) >= 5
+
