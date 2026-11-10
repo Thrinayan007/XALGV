@@ -14291,25 +14291,6 @@ FILE: traces\checkpoints\checkpoint_657df841-8a85-4430-a948-a816ca8eb157.json
 }
 
 ================================================================================
-FILE: traces\checkpoints\checkpoint_b60b0e48-e5cc-4ccf-9094-170d6b899808.json
-================================================================================
-
-{
-  "run_id": "b60b0e48-e5cc-4ccf-9094-170d6b899808",
-  "goal": "Open this exact YouTube results URL directly: https://www.youtube.com/results?search_query=Spy%20x%20Family. Wait for the page to load. If actual search results are visible, save a viewport screenshot to yt/search-results.png with browser_screenshot. Do not read the PNG as text. If YouTube shows an offline or error page, capture it and report the blocker honestly.",
-  "step_index": 0,
-  "plan": [
-    "Open the URL https://www.youtube.com/results?search_query=Spy%20x%20Family using browser_open.",
-    "Wait for the YouTube search results page to fully load using browser_wait.",
-    "Capture a full-page screenshot of the results and save it to yt/search-results.png using browser_screenshot."
-  ],
-  "scratchpad": "",
-  "status": "executing",
-  "messages_snapshot": [],
-  "metadata": {}
-}
-
-================================================================================
 FILE: traces\xbrowser-validation\administration-report.json
 ================================================================================
 

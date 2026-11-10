@@ -1,6 +1,7 @@
 """Bounded sequential execution, partial evidence, and no automatic replay."""
 
 import asyncio
+import json
 from contextlib import suppress
 
 from playwright.async_api import Error as PlaywrightError
@@ -60,7 +61,25 @@ async def run(session, request):
             return result
     success = failed_index is None
     failed = results[-1] if not success else None
-    output = "\n".join(f"{index + 1}. {item.action}: {'ok' if item.success else item.error_code}" for index, item in enumerate(results))
+    # Keep per-action evidence in the text returned to the model. The full
+    # structured results remain in ``data``, but working memory sends only
+    # ``output`` to the model. A bare "scroll: ok" hides movement and edge
+    # state, and hides observations bundled into a macro.
+    lines = []
+    for index, item in enumerate(results):
+        status = "ok" if item.success else (item.error_code or "failed")
+        line = f"{index + 1}. {item.action}: {status}"
+        if item.action_verification:
+            line += "\n   Evidence: " + json.dumps(item.action_verification, ensure_ascii=False, sort_keys=True)
+        if item.action == "observe" and item.output:
+            observation = item.output
+            if len(observation) > 2200:
+                observation = observation[:2100] + "\n…[observation shortened]…"
+            line += "\n   " + observation
+        if item.error:
+            line += "\n   Error: " + item.error[:500]
+        lines.append(line)
+    output = "\n".join(lines)
     artifacts = [path for item in results for path in item.artifacts]
     if artifacts:
         output += "\nArtifacts:\n" + "\n".join(artifacts)

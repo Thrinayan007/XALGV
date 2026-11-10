@@ -494,7 +494,7 @@ class BrowserWaitTool(_BrowserActionTool):
 class BrowserRunTool(_BrowserActionTool):
     name = "browser_run"
     action = "run"
-    description = "Run 1–20 deterministic browser steps sequentially; stops on failure. Each args object uses that action's API."
+    description = "Run 1–20 deterministic browser steps sequentially; stops on failure. Returns each step's verification evidence and observation text. Each args object uses that action's API."
     parameters_schema: ClassVar[dict[str, Any]] = {
         "type": "object", "properties": {
             "steps": {"type": "array", "minItems": 1, "maxItems": 20, "items": {
