@@ -37,6 +37,7 @@ async def cmd_run(args: argparse.Namespace) -> int:
     from local_agent.security.permissions import PermissionPolicy, PermissionTier
     from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
+    from local_agent.tools.image_question import ImageQuestionTool
     from local_agent.tools.python_exec import PythonExecTool
     from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
@@ -44,6 +45,10 @@ async def cmd_run(args: argparse.Namespace) -> int:
     from local_agent.tools.web_search import WebSearchTool
 
     config = AgentConfig.from_env()
+    model_override = getattr(args, "model", None)
+    if model_override:
+        config.use_generation_model(model_override)
+        logger.info("Using Ollama model %s for agent generation roles", model_override)
     config.ensure_dirs()
 
     sandbox = SandboxClient(config.sandbox_url)
@@ -80,6 +85,7 @@ async def cmd_run(args: argparse.Namespace) -> int:
         ),
         # Phase 2 — browser automation.
         *browser_tools(sandbox, vision_model=model_mgr),
+        ImageQuestionTool(config.workspace_dir, model_mgr, sandbox),
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),
@@ -125,6 +131,7 @@ async def cmd_eval(args: argparse.Namespace) -> int:
     from local_agent.security.permissions import PermissionPolicy, PermissionTier
     from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
+    from local_agent.tools.image_question import ImageQuestionTool
     from local_agent.tools.python_exec import PythonExecTool
     from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
@@ -167,6 +174,7 @@ async def cmd_eval(args: argparse.Namespace) -> int:
         ),
         # Phase 2 — browser automation.
         *browser_tools(sandbox, vision_model=model_mgr),
+        ImageQuestionTool(config.workspace_dir, model_mgr, sandbox),
         # Phase 2 — RAG / document intelligence.
         IngestDocumentTool(rag_pipeline),
         QueryDocumentsTool(rag_pipeline),
@@ -228,6 +236,17 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    """Start the local task and screenshot-question UI."""
+    import uvicorn
+
+    from local_agent.ui import app
+
+    print(f"XALGV UI: http://{args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    return 0
+
+
 # ── Health command ───────────────────────────────────────────────────────
 
 async def cmd_health(args: argparse.Namespace) -> int:
@@ -263,6 +282,10 @@ def cli_main() -> int:
     # run
     run_parser = subparsers.add_parser("run", help="Execute the agent with a goal.")
     run_parser.add_argument("goal", help="The goal for the agent to accomplish.")
+    run_parser.add_argument(
+        "--model",
+        help="Ollama model tag for planner, executor, router, vision, and translation roles (embeddings keep their configured model).",
+    )
     run_parser.add_argument("--acceptance", help="Trusted JSON file of deterministic acceptance checks.")
     run_parser.add_argument("--allow-execution", action="store_true", help="Trust shell/Python SYSTEM tools for this run; requires configured sandbox admin credentials.")
 
@@ -292,6 +315,11 @@ def cli_main() -> int:
     # health
     subparsers.add_parser("health", help="Check Ollama and sandbox connectivity.")
 
+    # local UI
+    ui_parser = subparsers.add_parser("ui", help="Start the local prompt and screenshot question UI.")
+    ui_parser.add_argument("--host", default="127.0.0.1", help="Interface to bind (default: localhost only).")
+    ui_parser.add_argument("--port", type=int, default=7860, help="Port for the local UI (default: 7860).")
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -313,6 +341,8 @@ def cli_main() -> int:
         return cmd_search(args)
     elif args.command == "health":
         return asyncio.run(cmd_health(args))
+    elif args.command == "ui":
+        return cmd_ui(args)
     return 1
 
 

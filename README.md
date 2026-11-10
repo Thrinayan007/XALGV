@@ -73,4 +73,14 @@ The last command runs the paired live Qwen evaluation and writes its report unde
 | `eval/` and `tests/` | Benchmarks and regression tests |
 | `docs/` | [Browser architecture](docs/xbrowser-architecture.md) and [multi-agent design](docs/multi-agent-architecture.md) |
 
+## Web UI Dashboard
+
+Start the agent web interface locally:
+
+```powershell
+.\.venv\Scripts\python -m local_agent.ui
+```
+
+Open [http://localhost:7860](http://localhost:7860) to interact with the agent through a web interface, attach images, and monitor runs.
+
 Stop the Docker services with `docker compose down`.

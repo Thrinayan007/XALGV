@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "markdown-it-py>=3,<5",
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]

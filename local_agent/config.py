@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 
@@ -117,6 +117,12 @@ class AgentConfig:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.trace_dir.mkdir(parents=True, exist_ok=True)
+
+    def use_generation_model(self, model_tag: str) -> None:
+        """Override text/image generation roles without changing the embedder."""
+        for role, role_config in self.model_roles.items():
+            if role != "embed":
+                self.model_roles[role] = replace(role_config, model=model_tag)
 
     @classmethod
     def from_env(cls) -> AgentConfig:
