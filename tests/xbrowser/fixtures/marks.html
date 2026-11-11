@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Marks fixture</title>
+<style>
+body { margin: 20px; }
+#covered { position:absolute; top: 600px; left:20px; width:140px; height:40px; }
+#overlay { position:absolute; top:600px; left:20px; width:140px; height:40px; z-index:20; background:white; }
+iframe { display:block; width:420px; height:90px; }
+</style>
+<h1>Reference fixture</h1>
+<label for="name">Display name</label><input id="name">
+<label>Password <input id="password" type="password" value="secret-do-not-expose"></label>
+<button id="save" onclick="document.querySelector('#result').textContent='Saved'">Save profile</button>
+<span id="clock">12:00</span><p id="result">Pending</p>
+<div id="replaceable"><button id="dynamic" onclick="window.clicked='original'">Dynamic action</button></div>
+<button id="covered">Covered action</button><div id="overlay">Overlay</div>
+<button hidden>Hidden action</button><input type="hidden" value="hidden-secret">
+<button disabled>Disabled action</button>
+<div id="shadow"></div>
+<iframe title="Same origin" src="frame.html"></iframe>
+<iframe id="cross" title="Cross origin"></iframe>
+<div style="height:1800px"></div><button id="bottom">Below viewport</button>
+<script>
+document.querySelector('#shadow').attachShadow({mode:'open'}).innerHTML =
+  '<label>Shadow name <input id="shadow-name"></label><button onclick="this.textContent=\'Shadow clicked\'">Shadow action</button>';
+document.querySelector('#cross').src = location.origin.replace('127.0.0.1','localhost') + '/frame.html';
+</script>
+</html>

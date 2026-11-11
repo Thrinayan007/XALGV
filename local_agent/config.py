@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 
@@ -17,16 +17,56 @@ class ModelRoleConfig:
     thinking: bool = False  # Use /think mode for this role
 
 
-# Sensible defaults for an RTX 5060 Laptop (8 GB VRAM).
+# Tool-use roles share one model/context to avoid role-switch reloads.
+# DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
+#     "planner": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.6, thinking=True),
+#     "executor": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
+#     "router": ModelRoleConfig(model="qwen3:1.7b", context_length=4096, temperature=0.1),
+#     "vision": ModelRoleConfig(model="qwen2.5-vl:7b", context_length=4096, temperature=0.3),
+#     "embed": ModelRoleConfig(model="bge-m3", context_length=8192, temperature=0.0),
+#     "translate": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
+# }
 DEFAULT_MODEL_ROLES: dict[str, ModelRoleConfig] = {
-    "planner": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.6, thinking=True),
-    "executor": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
-    "router": ModelRoleConfig(model="qwen3:1.7b", context_length=4096, temperature=0.1),
-    "vision": ModelRoleConfig(model="qwen2.5-vl:7b", context_length=4096, temperature=0.3),
-    "embed": ModelRoleConfig(model="bge-m3", context_length=8192, temperature=0.0),
-    "translate": ModelRoleConfig(model="qwen3:8b", context_length=8192, temperature=0.3),
-}
+    "planner": ModelRoleConfig(
+        model="qwen3.5:9b",
+        context_length=8192,
+        temperature=0.0,
+        thinking=False
+    ),
 
+    "executor": ModelRoleConfig(
+        model="qwen3.5:9b",
+        # context_length=4096,
+        # temperature=0.3
+        context_length=8192,
+        temperature=0.0,
+        thinking=False
+    ),
+
+    "router": ModelRoleConfig(
+        model="qwen3.5:9b",
+        context_length=4096,
+        temperature=0.1
+    ),
+
+    "vision": ModelRoleConfig(
+        model="qwen3.5:9b",
+        context_length=8192,
+        temperature=0.0
+    ),
+
+    "embed": ModelRoleConfig(
+        model="bge-m3",
+        context_length=8192,
+        temperature=0.0
+    ),
+
+    "translate": ModelRoleConfig(
+        model="qwen3.5:9b",
+        context_length=8192,
+        temperature=0.3
+    ),
+}
 
 @dataclass
 class AgentConfig:
@@ -52,6 +92,7 @@ class AgentConfig:
     # ── Paths ────────────────────────────────────────────────────────────
     project_root: Path = field(default_factory=lambda: Path(__file__).resolve().parent.parent)
     workspace_dir: Path = field(default=None)  # type: ignore[assignment]
+    data_dir: Path = field(default=None)  # type: ignore[assignment]
     db_path: Path = field(default=None)  # type: ignore[assignment]
     trace_dir: Path = field(default=None)  # type: ignore[assignment]
 
@@ -61,6 +102,8 @@ class AgentConfig:
     def __post_init__(self) -> None:
         if self.workspace_dir is None:
             self.workspace_dir = self.project_root / "workspace"
+        if self.data_dir is None:
+            self.data_dir = self.project_root / "data"
         if self.db_path is None:
             self.db_path = self.project_root / "data" / "agent.db"
         if self.trace_dir is None:
@@ -71,8 +114,15 @@ class AgentConfig:
     def ensure_dirs(self) -> None:
         """Create all required directories if they do not exist."""
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.trace_dir.mkdir(parents=True, exist_ok=True)
+
+    def use_generation_model(self, model_tag: str) -> None:
+        """Override text/image generation roles without changing the embedder."""
+        for role, role_config in self.model_roles.items():
+            if role != "embed":
+                self.model_roles[role] = replace(role_config, model=model_tag)
 
     @classmethod
     def from_env(cls) -> AgentConfig:

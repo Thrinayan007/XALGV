@@ -1,0 +1,44 @@
+{
+  "public_https": true,
+  "error": null,
+  "navigation": {
+    "error_code": null,
+    "action": "open",
+    "session_id": "eb7f3f02e0df4d04aedabc9104d11d74",
+    "generation": 1,
+    "tab_id": "t1",
+    "restarted": false,
+    "snapshot_id": null,
+    "state_before": "74a46cfe0cc27f8d",
+    "state_after": "83273c5e4c81853e",
+    "state_changed": true,
+    "data": {
+      "running": true,
+      "tabs": [
+        {
+          "tab_id": "t1",
+          "url": "https://example.com/",
+          "title": "Example Domain",
+          "active": true
+        }
+      ],
+      "events": []
+    },
+    "action_verification": {
+      "requested_url": "https://example.com/",
+      "final_url": "https://example.com/",
+      "status": 200,
+      "host_matches": true
+    },
+    "task_verification": "not_evaluated"
+  },
+  "observation_tokens": 103,
+  "fixture_exception_removed": true,
+  "original_body_assertion_passed": false,
+  "original_body_assertion_note": "The live page title remains Example Domain, but its visible body has changed. The obsolete body assertion correctly failed; this was a one-off transport check, not a live-site evaluation fixture.",
+  "transport_url_verified": true,
+  "process_environment_blocked": true,
+  "shell_without_admin_blocked": true,
+  "final_api_healthy": true,
+  "default_scope_restored": true
+}

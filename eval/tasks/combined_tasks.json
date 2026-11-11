@@ -1,0 +1,118 @@
+{
+  "tasks": [
+    {
+      "task_id": "combined_001",
+      "goal": "Create a Python virtual environment at /workspace/myenv using 'python3 -m venv /workspace/myenv', then list the contents of the /workspace/myenv/bin directory.",
+      "category": "combined",
+      "max_steps": 8,
+      "timeout_seconds": 120,
+      "tags": ["shell", "python", "venv"],
+      "checkers": [
+        {
+          "type": "shell",
+          "command": "test -d /workspace/myenv/bin || test -d /workspace/myenv/Scripts",
+          "description": "Virtual environment bin/Scripts directory exists"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/myenv/pyvenv.cfg"
+        }
+      ]
+    },
+    {
+      "task_id": "combined_002",
+      "goal": "Write a Python script /workspace/sysinfo.py that collects the hostname, current user, Python version, and OS info, then writes all of that to /workspace/system_report.txt. Run the script afterward.",
+      "category": "combined",
+      "max_steps": 10,
+      "timeout_seconds": 90,
+      "tags": ["python", "shell", "system"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/sysinfo.py"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/system_report.txt"
+        },
+        {
+          "type": "shell",
+          "command": "test -s /workspace/system_report.txt",
+          "description": "Report file is non-empty"
+        }
+      ]
+    },
+    {
+      "task_id": "combined_003",
+      "goal": "Create a bash script at /workspace/backup_workspace.sh that creates a timestamped backup directory /workspace/backups/<date>, copies all .py files from /workspace into it, and prints how many files were copied. Make it executable and run it.",
+      "category": "combined",
+      "max_steps": 12,
+      "timeout_seconds": 120,
+      "tags": ["shell", "scripting", "filesystem"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/backup_workspace.sh"
+        },
+        {
+          "type": "shell",
+          "command": "test -x /workspace/backup_workspace.sh",
+          "description": "Script is executable"
+        },
+        {
+          "type": "shell",
+          "command": "test -d /workspace/backups",
+          "description": "Backups directory was created"
+        }
+      ]
+    },
+    {
+      "task_id": "combined_004",
+      "goal": "Create a Python module at /workspace/textutils/textutils.py with functions: word_count(text), char_count(text), reverse_text(text), and title_case(text). Also create /workspace/textutils/tests/test_textutils.py with at least 4 tests. Run the tests with pytest.",
+      "category": "combined",
+      "max_steps": 15,
+      "timeout_seconds": 120,
+      "tags": ["python", "project", "testing"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/textutils/textutils.py"
+        },
+        {
+          "type": "file_exists",
+          "path": "/workspace/textutils/tests/test_textutils.py"
+        },
+        {
+          "type": "shell",
+          "command": "cd /workspace/textutils && python3 -m pytest tests/ -v 2>&1 | grep -q 'passed'",
+          "description": "All tests pass"
+        }
+      ]
+    },
+    {
+      "task_id": "combined_005",
+      "goal": "Write a Markdown file at /workspace/README.md documenting a fictional project called 'DataPipe'. Include a title, description, installation section with code blocks, usage examples, and a license section. The file must be at least 30 lines long.",
+      "category": "combined",
+      "max_steps": 8,
+      "timeout_seconds": 60,
+      "tags": ["file", "markdown", "documentation"],
+      "checkers": [
+        {
+          "type": "file_exists",
+          "path": "/workspace/README.md"
+        },
+        {
+          "type": "shell",
+          "command": "test $(wc -l < /workspace/README.md) -ge 30",
+          "description": "File has at least 30 lines"
+        },
+        {
+          "type": "shell",
+          "command": "grep -qi 'DataPipe' /workspace/README.md",
+          "description": "File mentions DataPipe"
+        }
+      ]
+    }
+  ]
+}
+

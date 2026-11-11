@@ -30,39 +30,90 @@ logger = logging.getLogger("xalgv")
 async def cmd_run(args: argparse.Namespace) -> int:
     """Run the agent with a goal."""
     from local_agent.core.loop import AgentLoop
+    from local_agent.core.task_verification import TaskVerifier
     from local_agent.memory.store import MemoryStore
     from local_agent.models import ModelManager
     from local_agent.sandbox.client import SandboxClient
-    from local_agent.security.permissions import PermissionPolicy
+    from local_agent.security.permissions import PermissionPolicy, PermissionTier
+    from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
+    from local_agent.tools.gui import gui_tools
+    from local_agent.tools.image_question import ImageQuestionTool
+    from local_agent.tools.office import office_tools
     from local_agent.tools.python_exec import PythonExecTool
+    from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
     from local_agent.tools.shell import ShellExecTool
+    from local_agent.tools.web_search import WebSearchTool
 
     config = AgentConfig.from_env()
+    model_override = getattr(args, "model", None)
+    if model_override:
+        config.use_generation_model(model_override)
+        logger.info("Using Ollama model %s for agent generation roles", model_override)
     config.ensure_dirs()
 
     sandbox = SandboxClient(config.sandbox_url)
     model_mgr = ModelManager(config)
     memory = MemoryStore(config.db_path)
 
+    # Initialise RAG pipeline (optional — degrades gracefully).
+    rag_pipeline = None
+    try:
+        from local_agent.rag import RAGPipeline, VectorStore
+        rag_pipeline = RAGPipeline(
+            model_manager=model_mgr,
+            vector_store=VectorStore(config.data_dir / "vectordb"),
+        )
+    except Exception:  # noqa: BLE001 - Optional RAG can fail during import or initialization.
+        logger.warning("RAG pipeline unavailable — document tools will return errors.")
+
     # Build tool registry.
-    registry = ToolRegistry(PermissionPolicy())
+    allow_execution = getattr(args, "allow_execution", False)
+    if allow_execution and not sandbox._admin_token:
+        raise ValueError("--allow-execution requires XALGV_SANDBOX_ADMIN_TOKEN and matching SANDBOX_ADMIN_TOKEN in the container")
+    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.SYSTEM if allow_execution else PermissionTier.NETWORK)
+    registry = ToolRegistry(policy)
     registry.register_many(
+        # Phase 1 — file & shell.
         ShellExecTool(sandbox),
         ReadFileTool(sandbox),
         WriteFileTool(sandbox),
         ListFilesTool(sandbox),
         PythonExecTool(sandbox),
+        WebSearchTool(
+            base_url=config.searxng_base_url,
+            trace_dir=str(config.trace_dir),
+        ),
+        # Phase 2 — browser automation.
+        *browser_tools(sandbox, vision_model=model_mgr),
+        ImageQuestionTool(config.workspace_dir, model_mgr, sandbox),
+        # Phase 2 — RAG / document intelligence.
+        IngestDocumentTool(rag_pipeline),
+        QueryDocumentsTool(rag_pipeline),
+        # Phase 3 — Office & GUI automation.
+        *office_tools(sandbox),
+        *gui_tools(sandbox),
     )
 
-    loop = AgentLoop(config, model_mgr, registry, memory)
+    loop = AgentLoop(config, model_mgr, registry, memory, task_verifier=TaskVerifier(sandbox))
 
     try:
-        result = await loop.run(args.goal)
+        acceptance_path = getattr(args, "acceptance", None)
+        checks = None
+        milestones = None
+        if acceptance_path:
+            from pathlib import Path
+            data = json.loads(Path(acceptance_path).read_text(encoding="utf-8"))
+            checks = data.get("checks") if isinstance(data, dict) else data
+            milestones = data.get("milestones") if isinstance(data, dict) else None
+            if checks is None and milestones is None:
+                raise ValueError("Acceptance file must contain checks or milestones")
+        result = await loop.run(args.goal, acceptance_checks=checks, milestones=milestones)
         print(f"\n{'='*60}")
         print(f"Run ID:  {result.run_id}")
         print(f"Status:  {result.status.value}")
+        print(f"Task checks: {result.metadata.get('task_verification', {}).get('status', 'not_evaluated')}")
         print(f"Steps:   {len(result.steps)}")
         print(f"Summary: {result.summary}")
         print(f"{'='*60}")
@@ -78,14 +129,21 @@ async def cmd_eval(args: argparse.Namespace) -> int:
     """Run the evaluation harness."""
     from eval.harness import EvalHarness
     from local_agent.core.loop import AgentLoop
+    from local_agent.core.task_verification import TaskVerifier
     from local_agent.memory.store import MemoryStore
     from local_agent.models import ModelManager
     from local_agent.sandbox.client import SandboxClient
-    from local_agent.security.permissions import PermissionPolicy
+    from local_agent.security.permissions import PermissionPolicy, PermissionTier
+    from local_agent.tools.browser import browser_tools
     from local_agent.tools.file_ops import ListFilesTool, ReadFileTool, WriteFileTool
+    from local_agent.tools.gui import gui_tools
+    from local_agent.tools.image_question import ImageQuestionTool
+    from local_agent.tools.office import office_tools
     from local_agent.tools.python_exec import PythonExecTool
+    from local_agent.tools.rag import IngestDocumentTool, QueryDocumentsTool
     from local_agent.tools.registry import ToolRegistry
     from local_agent.tools.shell import ShellExecTool
+    from local_agent.tools.web_search import WebSearchTool
 
     config = AgentConfig.from_env()
     config.ensure_dirs()
@@ -94,16 +152,45 @@ async def cmd_eval(args: argparse.Namespace) -> int:
     model_mgr = ModelManager(config)
     memory = MemoryStore(config.db_path)
 
-    registry = ToolRegistry(PermissionPolicy())
+    # Initialise RAG pipeline (optional — degrades gracefully).
+    rag_pipeline = None
+    try:
+        from local_agent.rag import RAGPipeline, VectorStore
+        rag_pipeline = RAGPipeline(
+            model_manager=model_mgr,
+            vector_store=VectorStore(config.data_dir / "vectordb"),
+        )
+    except Exception:  # noqa: BLE001 - Optional RAG can fail during import or initialization.
+        logger.warning("RAG pipeline unavailable — document tools will return errors.")
+
+    allow_execution = getattr(args, "allow_execution", False)
+    if allow_execution and not sandbox._admin_token:
+        raise ValueError("--allow-execution requires configured sandbox administration credentials")
+    policy = PermissionPolicy(auto_approve_up_to=PermissionTier.SYSTEM if allow_execution else PermissionTier.NETWORK)
+    registry = ToolRegistry(policy)
     registry.register_many(
+        # Phase 1 — file & shell.
         ShellExecTool(sandbox),
         ReadFileTool(sandbox),
         WriteFileTool(sandbox),
         ListFilesTool(sandbox),
         PythonExecTool(sandbox),
+        WebSearchTool(
+            base_url=config.searxng_base_url,
+            trace_dir=str(config.trace_dir),
+        ),
+        # Phase 2 — browser automation.
+        *browser_tools(sandbox, vision_model=model_mgr),
+        ImageQuestionTool(config.workspace_dir, model_mgr, sandbox),
+        # Phase 2 — RAG / document intelligence.
+        IngestDocumentTool(rag_pipeline),
+        QueryDocumentsTool(rag_pipeline),
+        # Phase 3 — Office & GUI automation.
+        *office_tools(sandbox),
+        *gui_tools(sandbox),
     )
 
-    agent_loop = AgentLoop(config, model_mgr, registry, memory)
+    agent_loop = AgentLoop(config, model_mgr, registry, memory, task_verifier=TaskVerifier(sandbox))
     harness = EvalHarness()
 
     try:
@@ -111,7 +198,7 @@ async def cmd_eval(args: argparse.Namespace) -> int:
         output = config.trace_dir / "eval_report.json"
         harness.save_report(report, output)
         print(f"\n{'='*60}")
-        print(f"Evaluation Report")
+        print("Evaluation Report")
         print(f"{'='*60}")
         print(f"Total:   {report.total_tasks}")
         print(f"Passed:  {report.passed}")
@@ -159,6 +246,17 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    """Start the local task and screenshot-question UI."""
+    import uvicorn
+
+    from local_agent.ui import app
+
+    print(f"XALGV UI: http://{args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    return 0
+
+
 # ── Health command ───────────────────────────────────────────────────────
 
 async def cmd_health(args: argparse.Namespace) -> int:
@@ -194,10 +292,27 @@ def cli_main() -> int:
     # run
     run_parser = subparsers.add_parser("run", help="Execute the agent with a goal.")
     run_parser.add_argument("goal", help="The goal for the agent to accomplish.")
+    run_parser.add_argument(
+        "--model",
+        help="Ollama model tag for planner, executor, router, vision, and translation roles (embeddings keep their configured model).",
+    )
+    run_parser.add_argument("--acceptance", help="Trusted JSON file of deterministic acceptance checks.")
+    run_parser.add_argument("--allow-execution", action="store_true", help="Trust shell/Python SYSTEM tools for this run; requires configured sandbox admin credentials.")
+
+    workflow_parser = subparsers.add_parser("multi-run", help="Execute a verified specialist workflow.")
+    workflow_parser.add_argument("goal")
+    workflow_parser.add_argument("--contract", required=True, help="Trusted workflow JSON file.")
+    inspect_parser = subparsers.add_parser("multi-inspect", help="Read one workflow's durable journal.")
+    inspect_parser.add_argument("run_id")
+    resume_parser = subparsers.add_parser("multi-resume", help="Resume a workflow from its durable journal.")
+    resume_parser.add_argument("run_id")
+    resume_parser.add_argument("--confirm-outcome", action="append", default=[], metavar="TASK",
+                               help="Confirm you independently reviewed the effects of this uncertain task.")
 
     # eval
     eval_parser = subparsers.add_parser("eval", help="Run the evaluation harness.")
     eval_parser.add_argument("--category", help="Only run tasks of this category.")
+    eval_parser.add_argument("--allow-execution", action="store_true", help="Trust shell/Python SYSTEM tools for evaluation; requires sandbox admin credentials.")
 
     # search
     search_parser = subparsers.add_parser("search", help="Run a web search via SearXNG.")
@@ -210,6 +325,11 @@ def cli_main() -> int:
     # health
     subparsers.add_parser("health", help="Check Ollama and sandbox connectivity.")
 
+    # local UI
+    ui_parser = subparsers.add_parser("ui", help="Start the local prompt and screenshot question UI.")
+    ui_parser.add_argument("--host", default="127.0.0.1", help="Interface to bind (default: localhost only).")
+    ui_parser.add_argument("--port", type=int, default=7860, help="Port for the local UI (default: 7860).")
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -217,12 +337,22 @@ def cli_main() -> int:
 
     if args.command == "run":
         return asyncio.run(cmd_run(args))
+    elif args.command in {"multi-run", "multi-resume"}:
+        from local_agent.agents.cli import run_workflow
+
+        return asyncio.run(run_workflow(args))
+    elif args.command == "multi-inspect":
+        from local_agent.agents.cli import inspect_workflow
+
+        return inspect_workflow(args)
     elif args.command == "eval":
         return asyncio.run(cmd_eval(args))
     elif args.command == "search":
         return cmd_search(args)
     elif args.command == "health":
         return asyncio.run(cmd_health(args))
+    elif args.command == "ui":
+        return cmd_ui(args)
     return 1
 
 

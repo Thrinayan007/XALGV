@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
 
 from local_agent.memory.store import RunStatus, StepRecord
 
@@ -26,6 +24,7 @@ class AgentState:
     scratchpad: str = ""
     last_error: str | None = None
     retry_count: int = 0
+    successful_actions_current_step: int = 0
 
     # ── Helpers ──────────────────────────────────────────────────────────
 
@@ -34,6 +33,7 @@ class AgentState:
         self.current_step += 1
         self.retry_count = 0
         self.last_error = None
+        self.successful_actions_current_step = 0
 
     def record(self, step: StepRecord) -> None:
         """Append a step to the history."""

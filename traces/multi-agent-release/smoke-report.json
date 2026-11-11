@@ -1,0 +1,304 @@
+{
+  "model": "qwen3.5:9b",
+  "results": [
+    {
+      "run_id": "single_e9c1fe61",
+      "mode": "single",
+      "passed": true,
+      "seconds": 156.98094490001677,
+      "model_calls": 8,
+      "tokens": 21129,
+      "resource_samples": {
+        "board_vram_mib": 4321
+      },
+      "evidence": {
+        "checks": [
+          {
+            "kind": "source_manifest",
+            "passed": true
+          },
+          {
+            "kind": "url",
+            "passed": true
+          },
+          {
+            "kind": "artifact",
+            "passed": true
+          },
+          {
+            "kind": "python_schema",
+            "passed": true
+          },
+          {
+            "kind": "markdown",
+            "passed": true
+          }
+        ]
+      },
+      "final_version_offline_artifact_checks": {
+        "source_manifest": true,
+        "artifact": true,
+        "python_schema": true,
+        "markdown": true
+      }
+    },
+    {
+      "run_id": "multi_62b7e3ba",
+      "mode": "multi",
+      "passed": true,
+      "seconds": 168.97913699998753,
+      "model_calls": 14,
+      "tokens": 21757,
+      "resource_samples": {
+        "host_rss_bytes": 139743232,
+        "board_vram_mib": 4375
+      },
+      "evidence": {
+        "schema_version": 1,
+        "run_id": "multi_62b7e3ba",
+        "tasks": [
+          {
+            "schema_version": 1,
+            "task_id": "research",
+            "state": "completed",
+            "attempts": [
+              {
+                "schema_version": 1,
+                "run_id": "multi_62b7e3ba",
+                "task_id": "research",
+                "attempt": 1,
+                "agent": "research",
+                "outcome": "reported_success",
+                "summary": "Executed research_export with query \"The Python Tutorial\" and saved 1 source record to artifacts/multi_62b7e3ba/research/sources.json. The output file now contains provenance data from docs.python.org as required.",
+                "artifacts": [
+                  {
+                    "path": "artifacts/multi_62b7e3ba/research/sources.json",
+                    "size_bytes": 401,
+                    "sha256": "226804a1cec440fa4fce803f7d452f68d637966632622924aa9e3506ef75a52d"
+                  }
+                ],
+                "usage": {
+                  "tool_steps": 1,
+                  "model_calls": 2,
+                  "prompt_tokens": 2174,
+                  "generated_tokens": 119,
+                  "wall_time_ms": 16017
+                },
+                "error_code": null
+              }
+            ],
+            "verification": {
+              "schema_version": 1,
+              "run_id": "multi_62b7e3ba",
+              "task_id": "research",
+              "attempt": 1,
+              "criteria_sha256": "692380a4f8fad34c47cc6803a60eca49d20f8fd1dda065097c3a77b971372ba1",
+              "outcomes": [
+                {
+                  "check_index": 0,
+                  "passed": true,
+                  "detail": null
+                }
+              ]
+            },
+            "detail": null,
+            "failure_code": null
+          },
+          {
+            "schema_version": 1,
+            "task_id": "browser",
+            "state": "completed",
+            "attempts": [
+              {
+                "schema_version": 1,
+                "run_id": "multi_62b7e3ba",
+                "task_id": "browser",
+                "attempt": 1,
+                "agent": "browser",
+                "outcome": "reported_success",
+                "summary": "Opened http://127.0.0.1:61467/profile.html and exported form fields to artifacts/multi_62b7e3ba/browser/fields.json containing \"Display name\".",
+                "artifacts": [
+                  {
+                    "path": "artifacts/multi_62b7e3ba/browser/fields.json",
+                    "size_bytes": 83,
+                    "sha256": "ab1aca71ec321ede47cedc7f00eb9363815ca46e00dfb027e566ad849870c90c"
+                  }
+                ],
+                "usage": {
+                  "tool_steps": 2,
+                  "model_calls": 3,
+                  "prompt_tokens": 4354,
+                  "generated_tokens": 134,
+                  "wall_time_ms": 19385
+                },
+                "error_code": null
+              }
+            ],
+            "verification": {
+              "schema_version": 1,
+              "run_id": "multi_62b7e3ba",
+              "task_id": "browser",
+              "attempt": 1,
+              "criteria_sha256": "c6464ce8b2875d7637d1f7384e8feda9255445fa0f45e210caaadf2130b5a5ba",
+              "outcomes": [
+                {
+                  "check_index": 0,
+                  "passed": true,
+                  "detail": null
+                },
+                {
+                  "check_index": 1,
+                  "passed": true,
+                  "detail": null
+                }
+              ]
+            },
+            "detail": null,
+            "failure_code": null
+          },
+          {
+            "schema_version": 1,
+            "task_id": "coding",
+            "state": "completed",
+            "attempts": [
+              {
+                "schema_version": 1,
+                "run_id": "multi_62b7e3ba",
+                "task_id": "coding",
+                "attempt": 1,
+                "agent": "coding",
+                "outcome": "reported_success",
+                "summary": "Read fields.json and wrote schema.py with SCHEMA = {\"Display name\": \"str\"}.",
+                "artifacts": [
+                  {
+                    "path": "artifacts/multi_62b7e3ba/coding/schema.py",
+                    "size_bytes": 39,
+                    "sha256": "c226d9d1afd8878c527bb4d08e3366f8d3996e6a30ed2b77090d3159ec9ee155"
+                  }
+                ],
+                "usage": {
+                  "tool_steps": 2,
+                  "model_calls": 3,
+                  "prompt_tokens": 4753,
+                  "generated_tokens": 129,
+                  "wall_time_ms": 18131
+                },
+                "error_code": null
+              }
+            ],
+            "verification": {
+              "schema_version": 1,
+              "run_id": "multi_62b7e3ba",
+              "task_id": "coding",
+              "attempt": 1,
+              "criteria_sha256": "5ba62e7fb0aead980872d0cd7d9250e0d5afccd8cbbabc026df05243247d035a",
+              "outcomes": [
+                {
+                  "check_index": 0,
+                  "passed": true,
+                  "detail": null
+                }
+              ]
+            },
+            "detail": null,
+            "failure_code": null
+          },
+          {
+            "schema_version": 1,
+            "task_id": "document",
+            "state": "completed",
+            "attempts": [
+              {
+                "schema_version": 1,
+                "run_id": "multi_62b7e3ba",
+                "task_id": "document",
+                "attempt": 1,
+                "agent": "document",
+                "outcome": "reported_success",
+                "summary": "Read the verified source, form, and schema artifacts. Wrote artifacts/multi_62b7e3ba/document/report.md as Markdown with headings Summary and Sources, and included a Markdown link to the source manifest URL (https://docs.python.org/3/tutorial/).",
+                "artifacts": [
+                  {
+                    "path": "artifacts/multi_62b7e3ba/document/report.md",
+                    "size_bytes": 491,
+                    "sha256": "e6e7484a7f3b631cd5531b81e6c1c0635a2795e3f840da2e4c4dff0e1613d0f7"
+                  }
+                ],
+                "usage": {
+                  "tool_steps": 4,
+                  "model_calls": 5,
+                  "prompt_tokens": 8970,
+                  "generated_tokens": 388,
+                  "wall_time_ms": 52426
+                },
+                "error_code": null
+              }
+            ],
+            "verification": {
+              "schema_version": 1,
+              "run_id": "multi_62b7e3ba",
+              "task_id": "document",
+              "attempt": 1,
+              "criteria_sha256": "0526de4d4ab8c0648188595fa98936a18a9bb9922f61dff2758571bec4551e87",
+              "outcomes": [
+                {
+                  "check_index": 0,
+                  "passed": true,
+                  "detail": null
+                }
+              ]
+            },
+            "detail": null,
+            "failure_code": null
+          }
+        ],
+        "final_checks": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "completed": true,
+        "wall_time_ms": 168971,
+        "detail": null,
+        "model_tokens_used": 21757
+      },
+      "final_version_offline_artifact_checks": {
+        "source_manifest": true,
+        "artifact": true,
+        "python_schema": true,
+        "markdown": true
+      }
+    }
+  ],
+  "summary": {
+    "single": {
+      "trials": 1,
+      "pass_rate": 1.0,
+      "median_success_seconds": 156.98094490001677,
+      "median_success_model_calls": 8,
+      "median_success_tokens": 21129
+    },
+    "multi": {
+      "trials": 1,
+      "pass_rate": 1.0,
+      "median_success_seconds": 168.97913699998753,
+      "median_success_model_calls": 14,
+      "median_success_tokens": 21757
+    }
+  },
+  "completed": true,
+  "release_gate": {
+    "passed": false,
+    "checks": {
+      "sample_size": false,
+      "fixture_success": true,
+      "success_vs_baseline": true,
+      "latency_vs_baseline": true
+    },
+    "latency_ratio": 1.0764308821533248,
+    "minimum_trials_per_mode": 3,
+    "minimum_pass_rate": 0.9,
+    "maximum_latency_ratio": 1.25
+  },
+  "scope": "one paired live smoke; final artifact verifier rerun offline"
+}

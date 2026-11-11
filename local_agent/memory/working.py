@@ -28,6 +28,8 @@ class WorkingMemory:
     _messages: list[dict[str, Any]] = field(default_factory=list, init=False)
     _plan: list[str] = field(default_factory=list, init=False)
     _scratchpad: str = field(default="", init=False)
+    _latest_observation: dict[str, Any] | None = field(default=None, init=False)
+    _latest_snapshot: str | None = field(default=None, init=False)
 
     # ── Token estimation ─────────────────────────────────────────────────
 
@@ -56,13 +58,29 @@ class WorkingMemory:
         self._messages.append(msg)
         self._compact_if_needed()
 
-    def add_tool_result(self, tool_call_id: str, content: str) -> None:
+    # def add_tool_result(self, tool_call_id: str, content: str) -> None:
+    #     """Append a tool result message."""
+    #     self._messages.append({
+    #         "role": "tool",
+    #         "content": self._truncate(content, max_chars=4000),
+    #         "tool_call_id": tool_call_id,
+    #     })
+    #     self._compact_if_needed()
+    def add_tool_result(self, tool_name: str, content: str, *, metadata=None, success=True) -> None:
         """Append a tool result message."""
-        self._messages.append({
+        message = {
             "role": "tool",
+            "tool_name": tool_name,
             "content": self._truncate(content, max_chars=4000),
-            "tool_call_id": tool_call_id,
-        })
+        }
+        if success and metadata and metadata.get("action") == "observe" and metadata.get("snapshot_id"):
+            if self._latest_observation is not None:
+                self._latest_observation["content"] = (
+                    f"[Observation {self._latest_snapshot} elided; superseded by {metadata['snapshot_id']}]."
+                )
+            self._latest_observation = message
+            self._latest_snapshot = metadata["snapshot_id"]
+        self._messages.append(message)
         self._compact_if_needed()
 
     def get_messages(self) -> list[dict[str, Any]]:
@@ -74,6 +92,8 @@ class WorkingMemory:
         self._messages.clear()
         self._plan.clear()
         self._scratchpad = ""
+        self._latest_observation = None
+        self._latest_snapshot = None
 
     @property
     def message_count(self) -> int:
@@ -92,14 +112,19 @@ class WorkingMemory:
 
     def _compact_if_needed(self) -> None:
         """Drop oldest non-system messages when over the token budget."""
+        max_iterations = len(self._messages) + 5  # Guard against infinite loops.
+        iterations = 0
         while self._total_tokens() > self.max_tokens and len(self._messages) > 2:
+            iterations += 1
+            if iterations > max_iterations:
+                break
             # Keep the first message (usually the goal) and the last few.
             removed = self._messages.pop(1)
-            # Insert a brief summary of what was dropped.
+            # Insert a brief summary of what was dropped (only once).
             if self._messages and self._messages[0].get("role") == "user":
                 pass  # keep the goal message
             summary_note = f"[Earlier message removed for context management: {removed.get('role', '?')}]"
-            # Don't insert summary if the next message is already a summary note.
+            # Don't insert summary if we already have one.
             if not any("[Earlier message removed" in str(m.get("content", "")) for m in self._messages[:2]):
                 self._messages.insert(1, {"role": "system", "content": summary_note})
 

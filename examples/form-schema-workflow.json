@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "run_id": "form_demo",
+  "max_steps": 24,
+  "max_wall_time_seconds": 400,
+  "tasks": [
+    {
+      "task": {
+        "run_id": "form_demo",
+        "task_id": "inspect",
+        "agent": "browser",
+        "objective": "Call browser_open on http://127.0.0.1:8765/first.html. Then call browser_export separately to capture form fields at artifacts/form_demo/inspect/fields.json.",
+        "expected_outputs": ["artifacts/form_demo/inspect/fields.json"],
+        "max_steps": 8,
+        "max_wall_time_seconds": 150,
+        "acceptance_checks": [
+          {"kind": "url", "expected": "http://127.0.0.1:8765/first.html"},
+          {"kind": "artifact", "path": "artifacts/form_demo/inspect/fields.json", "contains": "\"Name\""}
+        ]
+      },
+      "required_tools": ["browser_open", "browser_export"],
+      "tool_allowlist": ["browser_open", "browser_export"]
+    },
+    {
+      "task": {
+        "run_id": "form_demo",
+        "task_id": "code",
+        "agent": "coding",
+        "objective": "Read the verified form export. Generate schema.py as a literal SCHEMA dictionary mapping field names to types, then run validate_python_schema against the export.",
+        "expected_outputs": ["artifacts/form_demo/code/schema.py"],
+        "max_steps": 10,
+        "max_wall_time_seconds": 170,
+        "acceptance_checks": [
+          {"kind": "python_schema", "path": "artifacts/form_demo/code/schema.py", "fields": [{"name": "Name", "type": "str"}]}
+        ]
+      },
+      "bindings": [
+        {"name": "form_fields", "producer_task_id": "inspect", "path": "artifacts/form_demo/inspect/fields.json"}
+      ],
+      "required_tools": ["read_file", "write_file", "validate_python_schema"]
+    }
+  ],
+  "final_checks": [
+    {"kind": "python_schema", "path": "artifacts/form_demo/code/schema.py", "fields": [{"name": "Name", "type": "str"}]}
+  ]
+}
